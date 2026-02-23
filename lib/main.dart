@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:karoseri_mobile/auth/login.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'features/dashboard/dashboard_page.dart';
 
@@ -25,7 +26,7 @@ class KaroseriApp extends StatelessWidget {
       title: 'Manajemen Karoseri',
       //tema warna (opsional)
       theme: ThemeData(primarySwatch: Colors.brown, useMaterial3: true),
-      home: const DashboardPage(),
+      home: const LoginPage(),
     );
   }
 }
