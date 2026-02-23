@@ -5,6 +5,7 @@ import 'package:karoseri_mobile/features/dashboard/dashboard_page.dart'; // Impo
 import 'package:karoseri_mobile/features/dashboard/dashboard_direktur.dart'; // Import file dashboard direktur
 import 'package:karoseri_mobile/features/dashboard/dashboard_cust.dart'; // Import file dashboard direktur
 import 'user.dart';
+import 'regist.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -176,6 +177,19 @@ class _LoginPageState extends State<LoginPage> {
                   "MASUK",
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const RegisterPage()),
+                );
+              },
+              child: const Text(
+                "Belum punya akun? Daftar di sini",
+                style: TextStyle(color: Colors.blue),
               ),
             ),
           ],
