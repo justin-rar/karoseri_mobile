@@ -70,7 +70,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
             ),
             const SizedBox(height: 5),
             const Text(
-              "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+              "Silahkan isi formulir pengerjaan proyek karoseri di bawah ini dengan lengkap.",
               style: TextStyle(fontSize: 14, color: Colors.black54),
             ),
             const SizedBox(height: 30),
@@ -117,35 +117,39 @@ class _AddProjectPageState extends State<AddProjectPage> {
               ],
             ),
 
-            // --- BAGIAN DROPDOWN PEMBAYARAN ---
             _labelInput("pembayaran"),
             _buildDropdownPembayaran(),
 
             const SizedBox(height: 30),
 
+            // --- BAGIAN TABEL KEBUTUHAN BARANG (YANG SUDAH DIPERBAGUS) ---
             const Text(
               "Kebutuhan Barang",
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 10),
+
             Container(
+              clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.black),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.black26),
               ),
               child: Column(
                 children: [
+                  // Header
                   Container(
                     color: const Color(0xFFD4B07E),
                     padding: const EdgeInsets.symmetric(
-                      vertical: 8,
-                      horizontal: 4,
+                      vertical: 12,
+                      horizontal: 10,
                     ),
                     child: const Row(
                       children: [
                         Expanded(
                           flex: 3,
                           child: Text(
-                            "nama barang",
+                            "Nama Barang",
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
@@ -155,7 +159,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
                         Expanded(
                           flex: 2,
                           child: Text(
-                            "harga",
+                            "Harga",
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
@@ -165,26 +169,31 @@ class _AddProjectPageState extends State<AddProjectPage> {
                         Expanded(
                           flex: 1,
                           child: Text(
-                            "jumlah",
+                            "Qty",
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),
+                        SizedBox(width: 40),
                       ],
                     ),
                   ),
+                  // Body
                   Column(
                     children: listBarang.asMap().entries.map((entry) {
                       int index = entry.key;
                       return Container(
-                        decoration: const BoxDecoration(
-                          border: Border(
+                        decoration: BoxDecoration(
+                          color: index % 2 == 0
+                              ? Colors.white
+                              : Colors.grey[50],
+                          border: const Border(
                             top: BorderSide(color: Colors.black12),
                           ),
                         ),
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
                         child: Row(
                           children: [
                             Expanded(
@@ -193,7 +202,9 @@ class _AddProjectPageState extends State<AddProjectPage> {
                                 decoration: const InputDecoration(
                                   hintText: "...",
                                   border: InputBorder.none,
+                                  hintStyle: TextStyle(fontSize: 13),
                                 ),
+                                style: const TextStyle(fontSize: 13),
                                 onChanged: (val) =>
                                     listBarang[index]['nama'] = val,
                               ),
@@ -205,7 +216,9 @@ class _AddProjectPageState extends State<AddProjectPage> {
                                 decoration: const InputDecoration(
                                   hintText: "0",
                                   border: InputBorder.none,
+                                  hintStyle: TextStyle(fontSize: 13),
                                 ),
+                                style: const TextStyle(fontSize: 13),
                                 onChanged: (val) =>
                                     listBarang[index]['harga'] = val,
                               ),
@@ -213,14 +226,29 @@ class _AddProjectPageState extends State<AddProjectPage> {
                             Expanded(
                               flex: 1,
                               child: TextField(
+                                textAlign: TextAlign.center,
                                 keyboardType: TextInputType.number,
                                 decoration: const InputDecoration(
                                   hintText: "0",
                                   border: InputBorder.none,
+                                  hintStyle: TextStyle(fontSize: 13),
                                 ),
+                                style: const TextStyle(fontSize: 13),
                                 onChanged: (val) =>
                                     listBarang[index]['jumlah'] = val,
                               ),
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.remove_circle_outline,
+                                color: Colors.redAccent,
+                                size: 20,
+                              ),
+                              onPressed: () {
+                                if (listBarang.length > 1) {
+                                  setState(() => listBarang.removeAt(index));
+                                }
+                              },
                             ),
                           ],
                         ),
@@ -230,18 +258,19 @@ class _AddProjectPageState extends State<AddProjectPage> {
                 ],
               ),
             ),
+            const SizedBox(height: 8),
             Align(
               alignment: Alignment.centerRight,
-              child: GestureDetector(
-                onTap: _tambahBarisBarang,
-                child: Container(
-                  margin: const EdgeInsets.only(top: 8),
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFD4B07E),
-                    border: Border.all(color: Colors.black),
+              child: ElevatedButton.icon(
+                onPressed: _tambahBarisBarang,
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text("Tambah Baris"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD4B07E),
+                  foregroundColor: Colors.black,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                  child: const Icon(Icons.add, size: 20),
                 ),
               ),
             ),
@@ -256,18 +285,20 @@ class _AddProjectPageState extends State<AddProjectPage> {
             const SizedBox(height: 40),
 
             SizedBox(
-              width: 130,
-              height: 45,
+              width: double.infinity, // Dibuat lebar penuh agar lebih mantap
+              height: 50,
               child: ElevatedButton(
                 onPressed: () {
-                  print("Metode Bayar: $_pilihanPembayaran");
+                  debugPrint(
+                    "Simpan Proyek dengan metode: $_pilihanPembayaran",
+                  );
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFE0E0E0),
+                  backgroundColor: const Color(0xFFD4B07E),
                   foregroundColor: Colors.black,
                 ),
                 child: const Text(
-                  "TAMBAH",
+                  "TAMBAH PROYEK",
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
@@ -279,7 +310,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
     );
   }
 
-  // --- WIDGET DROPDOWN ---
+  // --- WIDGET HELPER ---
   Widget _buildDropdownPembayaran() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -288,10 +319,9 @@ class _AddProjectPageState extends State<AddProjectPage> {
         borderRadius: BorderRadius.circular(4),
       ),
       child: DropdownButtonHideUnderline(
-        // Supaya garis bawah bawaannya hilang
         child: DropdownButton<String>(
           value: _pilihanPembayaran,
-          isExpanded: true, // Supaya lebarnya penuh
+          isExpanded: true,
           items: const [
             DropdownMenuItem(value: "cash", child: Text("Cash")),
             DropdownMenuItem(value: "leasing", child: Text("Leasing")),
@@ -306,11 +336,17 @@ class _AddProjectPageState extends State<AddProjectPage> {
     );
   }
 
-  // --- Fungsi Helper Lainnya ---
   Widget _labelInput(String text) {
     return Padding(
       padding: const EdgeInsets.only(top: 15, bottom: 5),
-      child: Text(text, style: const TextStyle(fontSize: 14)),
+      child: Text(
+        text.toUpperCase(),
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          color: Colors.black87,
+        ),
+      ),
     );
   }
 
