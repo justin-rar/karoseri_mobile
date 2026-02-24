@@ -32,7 +32,7 @@ class _InventoryPageState extends State<InventoryPage> {
       final data = await supabase
           .from('inventory')
           .select()
-          .order('id', ascending: false); // Data terbaru muncul di atas
+          .order('id', ascending: false);
 
       setState(() {
         inventoryData = data;
@@ -44,17 +44,15 @@ class _InventoryPageState extends State<InventoryPage> {
     }
   }
 
-  // --- 2. FUNGSI SIMPAN KE DATABASE ---
+  // --- 2. FUNGSI SIMPAN INPUT BARU KE DATABASE ---
   Future<void> _simpanKeDatabase() async {
     try {
-      // Tampilkan Loading Spinner
       showDialog(
         context: context,
         barrierDismissible: false,
         builder: (context) => const Center(child: CircularProgressIndicator()),
       );
 
-      // Filter data agar baris kosong tidak ikut terkirim
       final dataToSave = listBarang
           .where((item) => item['nama'].toString().trim().isNotEmpty)
           .map(
@@ -66,34 +64,50 @@ class _InventoryPageState extends State<InventoryPage> {
           .toList();
 
       if (dataToSave.isEmpty) {
-        Navigator.pop(context); // Tutup loading
+        Navigator.pop(context);
         return;
       }
 
-      // Eksekusi Insert ke tabel 'inventory'
       await supabase.from('inventory').insert(dataToSave);
 
       if (mounted) {
-        Navigator.pop(context); // Tutup loading
+        Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Stok Berhasil Disimpan!")),
         );
 
-        // Reset form input ke awal
         setState(() {
           listBarang = [
             {"nama": "", "jumlah": ""},
           ];
         });
 
-        // Ambil data ulang agar daftar di HP langsung terupdate
         _ambilDataDariDatabase();
       }
     } catch (e) {
-      if (mounted) Navigator.pop(context); // Tutup loading
+      if (mounted) Navigator.pop(context);
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text("Gagal menyimpan: $e")));
+    }
+  }
+
+  // --- 3. FUNGSI UPDATE STOK (PLUS / MINUS) ---
+  Future<void> _updateStok(int id, int stokBaru) async {
+    if (stokBaru < 0) return; // Validasi minimal 0 unit
+
+    try {
+      await supabase.from('inventory').update({'stok': stokBaru}).eq('id', id);
+
+      // Refresh data tanpa loading berat agar smooth
+      _ambilDataDariDatabase();
+    } catch (e) {
+      debugPrint("Error update stok: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Gagal update: $e")));
+      }
     }
   }
 
@@ -137,13 +151,8 @@ class _InventoryPageState extends State<InventoryPage> {
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
             ),
             const SizedBox(height: 10),
-
-            // --- TABEL INPUT ---
             _buildInputTable(),
-
             const SizedBox(height: 30),
-
-            // --- TOMBOL SIMPAN ---
             SizedBox(
               width: double.infinity,
               height: 50,
@@ -158,23 +167,19 @@ class _InventoryPageState extends State<InventoryPage> {
                   ),
                 ),
                 child: const Text(
-                  "SIMPAN PERUBAHAN",
+                  "SIMPAN BARANG BARU",
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
             ),
-
             const SizedBox(height: 40),
             const Divider(color: Colors.black45, thickness: 1),
             const SizedBox(height: 20),
-
             const Text(
-              "DAFTAR STOK TERSEDIA (DATABASE)",
+              "DAFTAR STOK TERSEDIA",
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
             ),
             const SizedBox(height: 10),
-
-            // --- DAFTAR DATA DARI DATABASE ---
             _buildDisplayTable(),
           ],
         ),
@@ -190,7 +195,6 @@ class _InventoryPageState extends State<InventoryPage> {
           decoration: BoxDecoration(border: Border.all(color: Colors.black)),
           child: Column(
             children: [
-              // Header Tabel
               Container(
                 color: const Color(0xFFD4B07E),
                 padding: const EdgeInsets.symmetric(vertical: 12),
@@ -200,7 +204,7 @@ class _InventoryPageState extends State<InventoryPage> {
                       flex: 3,
                       child: Center(
                         child: Text(
-                          "nama barang",
+                          "Nama Barang",
                           style: TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -209,7 +213,7 @@ class _InventoryPageState extends State<InventoryPage> {
                       flex: 1,
                       child: Center(
                         child: Text(
-                          "jumlah",
+                          "Jumlah",
                           style: TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -218,7 +222,6 @@ class _InventoryPageState extends State<InventoryPage> {
                   ],
                 ),
               ),
-              // Body Input Dinamis
               ...listBarang.asMap().entries.map((entry) {
                 int index = entry.key;
                 return Container(
@@ -295,20 +298,10 @@ class _InventoryPageState extends State<InventoryPage> {
     );
   }
 
-  // --- WIDGET UNTUK MENAMPILKAN DATA (PRINT KE HP) ---
   Widget _buildDisplayTable() {
-    if (isLoadingData) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (inventoryData.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(20.0),
-          child: Text("Belum ada data di database."),
-        ),
-      );
-    }
+    if (isLoadingData) return const Center(child: CircularProgressIndicator());
+    if (inventoryData.isEmpty)
+      return const Center(child: Text("Belum ada data."));
 
     return Container(
       decoration: BoxDecoration(
@@ -317,46 +310,75 @@ class _InventoryPageState extends State<InventoryPage> {
       ),
       child: Column(
         children: inventoryData.map((item) {
+          int currentStok = int.tryParse(item['stok'].toString()) ?? 0;
+          int id = item['id'];
+
           return Container(
-            padding: const EdgeInsets.all(15),
+            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
             decoration: const BoxDecoration(
               border: Border(bottom: BorderSide(color: Colors.black12)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item['nama_barang'].toString(),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const Text(
+                        "Status: Tersedia",
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                ),
+                Row(
                   children: [
-                    Text(
-                      item['nama_barang'].toString(),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                    IconButton(
+                      onPressed: currentStok > 0
+                          ? () => _updateStok(id, currentStok - 1)
+                          : null,
+                      icon: Icon(
+                        Icons.remove_circle_outline,
+                        color: currentStok > 0 ? Colors.red : Colors.grey,
                       ),
                     ),
-                    const Text(
-                      "Status: Tersedia",
-                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.blueGrey[50],
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: Colors.blueGrey.withOpacity(0.2),
+                        ),
+                      ),
+                      child: Text(
+                        "$currentStok",
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: Colors.blueGrey,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => _updateStok(id, currentStok + 1),
+                      icon: const Icon(
+                        Icons.add_circle_outline,
+                        color: Colors.green,
+                      ),
                     ),
                   ],
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.blueGrey[50],
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    "${item['stok']} Unit",
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blueGrey,
-                    ),
-                  ),
                 ),
               ],
             ),
