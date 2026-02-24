@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+// Pastikan path import ini sesuai dengan lokasi file DetailProgressPage kamu
+import 'detail_update_progress_page.dart';
 
 class UpdateProgressPage extends StatefulWidget {
   const UpdateProgressPage({super.key});
@@ -19,18 +21,19 @@ class _UpdateProgressPageState extends State<UpdateProgressPage> {
     _fetchProjects();
   }
 
-  // Fungsi untuk mengambil data project dari database
   Future<void> _fetchProjects() async {
     try {
       setState(() => isLoading = true);
 
+      // Kita ambil data dari tabel 'projects'
+      // Jika kamu ingin datanya sinkron dengan tabel 'progress_project',
+      // pastikan relasi ID-nya benar.
       final data = await supabase
           .from('projects')
           .select()
           .order('created_at', ascending: false);
 
-      // Log untuk memastikan data sampai di HP atau tidak
-      debugPrint("Data dari Supabase: $data");
+      debugPrint("Data Proyek: $data");
 
       setState(() {
         projects = data;
@@ -78,8 +81,6 @@ class _UpdateProgressPageState extends State<UpdateProgressPage> {
               itemCount: projects.length,
               itemBuilder: (context, index) {
                 final project = projects[index];
-
-                // Logika warna selang-seling: Genap = Abu, Ganjil = Cokelat
                 final bool isEven = index % 2 == 0;
                 final Color cardColor = isEven
                     ? const Color(0xFFD9D9D9)
@@ -87,10 +88,17 @@ class _UpdateProgressPageState extends State<UpdateProgressPage> {
 
                 return GestureDetector(
                   onTap: () {
-                    debugPrint(
-                      "Navigasi ke Detail Project: ${project['nama_project']}",
-                    );
-                    // TODO: Navigator ke DetailProgressPage
+                    // --- PROSES NAVIGASI KE DETAIL ---
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            DetailProgressPage(projectData: project),
+                      ),
+                    ).then((value) {
+                      // Refresh data saat kembali dari halaman detail
+                      _fetchProjects();
+                    });
                   },
                   child: Container(
                     margin: const EdgeInsets.only(bottom: 20),
@@ -102,19 +110,29 @@ class _UpdateProgressPageState extends State<UpdateProgressPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          project['nama_project']?.toString().toUpperCase() ??
-                              "NAMA-PROJECT",
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                project['nama_project']
+                                        ?.toString()
+                                        .toUpperCase() ??
+                                    "NAMA PROJECT",
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            const Icon(Icons.arrow_forward_ios, size: 16),
+                          ],
                         ),
                         const SizedBox(height: 10),
                         Text(
                           project['deskripsi']?.toString() ??
                               "Tidak ada deskripsi untuk proyek ini.",
-                          maxLines: 3,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(fontSize: 14),
                         ),
