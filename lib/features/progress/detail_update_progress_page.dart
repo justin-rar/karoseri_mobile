@@ -14,19 +14,18 @@ class DetailProgressPage extends StatefulWidget {
 class _DetailProgressPageState extends State<DetailProgressPage> {
   final supabase = Supabase.instance.client;
   bool isLoading = false;
-  File? imageFile;
 
-  // Status yang tersedia
+  // List menampung gambar baru (lokal) & gambar lama (URL)
+  List<File> selectedImages = [];
+  List<String> existingUrls = [];
+
   final List<String> statusOptions = [
     'Belum dikerjakan',
     'Sedang dikerjakan',
     'Selesai',
   ];
-
-  // Map untuk menyimpan status tahapan
   late Map<String, String> progressStatus;
 
-  // Definisi 7 Tahapan sesuai permintaan sebelumnya
   final List<Map<String, String>> tahapan = [
     {
       'key': 'tahap_1',
@@ -68,57 +67,67 @@ class _DetailProgressPageState extends State<DetailProgressPage> {
   @override
   void initState() {
     super.initState();
-    // Proteksi Null: Jika data dari list utama kosong, set default ke 'Belum dikerjakan'
+    // Load status dropdown dari database
     progressStatus = {
       for (var t in tahapan)
         t['key']!:
             widget.projectData[t['key']]?.toString() ?? 'Belum dikerjakan',
     };
+
+    // Load URL foto lama, pecah String jadi List
+    String urls = widget.projectData['foto_url']?.toString() ?? "";
+    if (urls.isNotEmpty) {
+      existingUrls = urls.split(',');
+    }
   }
 
-  Future<void> _pickImage() async {
-    final picked = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
+  Future<void> _pickImages() async {
+    final List<XFile> pickedList = await ImagePicker().pickMultiImage(
       imageQuality: 50,
     );
-    if (picked != null) {
-      setState(() => imageFile = File(picked.path));
+    if (pickedList.isNotEmpty) {
+      setState(() {
+        selectedImages.addAll(pickedList.map((x) => File(x.path)).toList());
+      });
     }
+  }
+
+  // Fungsi hapus foto yang baru dipilih (sebelum upload)
+  void _removeSelectedImage(int index) {
+    setState(() => selectedImages.removeAt(index));
+  }
+
+  // Fungsi hapus foto yang sudah ada di database
+  void _removeExistingImage(int index) {
+    setState(() => existingUrls.removeAt(index));
   }
 
   Future<void> _updateProgress() async {
-    // ANALISIS ID: Merujuk pada kolom 'id_project' sesuai gambar skema kamu
     final dynamic projectId = widget.projectData['id_project'];
-
-    if (projectId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Error: ID Proyek tidak ditemukan"),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
+    if (projectId == null) return;
 
     FocusScope.of(context).unfocus();
     setState(() => isLoading = true);
 
     try {
-      String? imageUrl = widget.projectData['foto_url']?.toString() ?? "";
+      List<String> newUploadedUrls = [];
 
-      // 1. Upload Foto jika ada yang baru
-      if (imageFile != null) {
+      // 1. Upload foto-foto baru ke Storage
+      for (File image in selectedImages) {
         final fileName =
-            'img_${projectId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-        await supabase.storage
-            .from('progress_images')
-            .upload(fileName, imageFile!);
-        imageUrl = supabase.storage
+            'img_${projectId}_${DateTime.now().microsecondsSinceEpoch}.jpg';
+        await supabase.storage.from('progress_images').upload(fileName, image);
+        final String publicUrl = supabase.storage
             .from('progress_images')
             .getPublicUrl(fileName);
+        newUploadedUrls.add(publicUrl);
       }
 
-      // 2. Update data ke tabel 'projects'
+      // 2. Gabungkan yang lama (setelah mungkin ada yang dihapus) & yang baru
+      List<String> finalUrls = [...existingUrls, ...newUploadedUrls];
+      String joinedUrls = finalUrls.join(',');
+
+      // 3. Update Status & Galeri ke Database
       await supabase
           .from('projects')
           .update({
@@ -129,29 +138,21 @@ class _DetailProgressPageState extends State<DetailProgressPage> {
             'tahap_5': progressStatus['tahap_5'],
             'tahap_6': progressStatus['tahap_6'],
             'tahap_7': progressStatus['tahap_7'],
-            'foto_url': imageUrl,
+            'foto_url': joinedUrls,
           })
-          .eq('id_project', projectId); // Sesuaikan ID Project
+          .eq('id_project', projectId);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text("Progress Berhasil Diperbarui!"),
+            content: Text("Berhasil memperbarui data!"),
             backgroundColor: Colors.green,
           ),
         );
         Navigator.pop(context, true);
       }
     } catch (e) {
-      debugPrint("Error: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Gagal Update: $e"),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      debugPrint("Update Error: $e");
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
@@ -163,7 +164,7 @@ class _DetailProgressPageState extends State<DetailProgressPage> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text(
-          "Detail Progress",
+          "Update Progres",
           style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.white,
@@ -178,7 +179,7 @@ class _DetailProgressPageState extends State<DetailProgressPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header Card
+            // Header
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(15),
@@ -195,51 +196,81 @@ class _DetailProgressPageState extends State<DetailProgressPage> {
                             .toUpperCase() ??
                         "PROJECT",
                     style: const TextStyle(
-                      fontSize: 18,
                       fontWeight: FontWeight.bold,
+                      fontSize: 18,
                     ),
                   ),
                   const SizedBox(height: 5),
                   Text(
                     widget.projectData['deskripsi']?.toString() ??
                         "Tidak ada deskripsi",
-                    style: const TextStyle(fontSize: 13, color: Colors.black54),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 25),
 
-            // List Dropdown Tahapan
+            // Dropdowns
+            const Text(
+              "STATUS TAHAPAN",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 10),
             ...tahapan.map(
               (t) => _buildStepCard(t['judul']!, t['sub']!, t['key']!),
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 25),
+
+            // Gallery Grid
             const Text(
-              "TAMBAH GAMBAR PROGRESS",
+              "GALERI FOTO PROGRESS",
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 10),
-
-            // Image Picker UI
-            GestureDetector(
-              onTap: _pickImage,
-              child: Container(
-                height: 180,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  border: Border.all(color: Colors.grey[300]!),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: _buildImagePreview(),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: existingUrls.length + selectedImages.length + 1,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
               ),
+              itemBuilder: (context, index) {
+                if (index == 0) {
+                  return GestureDetector(
+                    onTap: _pickImages,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        border: Border.all(color: Colors.grey[300]!),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.add_a_photo, color: Colors.grey),
+                    ),
+                  );
+                }
+
+                int i = index - 1;
+                if (i < existingUrls.length) {
+                  return _buildPhotoTile(
+                    existingUrls[i],
+                    isNetwork: true,
+                    onRemove: () => _removeExistingImage(i),
+                  );
+                } else {
+                  int fileIdx = i - existingUrls.length;
+                  return _buildPhotoTile(
+                    selectedImages[fileIdx],
+                    isNetwork: false,
+                    onRemove: () => _removeSelectedImage(fileIdx),
+                  );
+                }
+              },
             ),
 
-            const SizedBox(height: 30),
-
-            // Submit Button
+            const SizedBox(height: 35),
             SizedBox(
               width: double.infinity,
               height: 50,
@@ -254,7 +285,7 @@ class _DetailProgressPageState extends State<DetailProgressPage> {
                 child: isLoading
                     ? const CircularProgressIndicator(color: Colors.black)
                     : const Text(
-                        "UPDATE PROGRESS",
+                        "SIMPAN PERUBAHAN",
                         style: TextStyle(
                           color: Colors.black,
                           fontWeight: FontWeight.bold,
@@ -262,40 +293,55 @@ class _DetailProgressPageState extends State<DetailProgressPage> {
                       ),
               ),
             ),
-            const SizedBox(height: 30),
+            const SizedBox(height: 40),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildImagePreview() {
-    if (imageFile != null) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: Image.file(imageFile!, fit: BoxFit.cover),
-      );
-    } else if (widget.projectData['foto_url'] != null &&
-        widget.projectData['foto_url'] != "") {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: Image.network(widget.projectData['foto_url'], fit: BoxFit.cover),
-      );
-    } else {
-      return const Center(
-        child: Icon(Icons.add_a_photo_outlined, size: 40, color: Colors.grey),
-      );
-    }
+  Widget _buildPhotoTile(
+    dynamic source, {
+    required bool isNetwork,
+    required VoidCallback onRemove,
+  }) {
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: isNetwork
+                ? Image.network(source as String, fit: BoxFit.cover)
+                : Image.file(source as File, fit: BoxFit.cover),
+          ),
+        ),
+        Positioned(
+          top: 2,
+          right: 2,
+          child: GestureDetector(
+            onTap: onRemove,
+            child: Container(
+              padding: const EdgeInsets.all(2),
+              decoration: const BoxDecoration(
+                color: Colors.black54,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.close, size: 16, color: Colors.white),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildStepCard(String judul, String sub, String key) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 15),
+      margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFD4B07E).withOpacity(0.2),
+        color: const Color(0xFFD4B07E).withOpacity(0.1),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFD4B07E)),
+        border: Border.all(color: const Color(0xFFD4B07E).withOpacity(0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
