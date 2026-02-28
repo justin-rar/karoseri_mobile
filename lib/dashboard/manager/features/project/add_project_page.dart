@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:supabase_flutter/supabase_flutter.dart'; // 1. Import Supabase
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AddProjectPage extends StatefulWidget {
   const AddProjectPage({super.key});
@@ -10,7 +10,6 @@ class AddProjectPage extends StatefulWidget {
 }
 
 class _AddProjectPageState extends State<AddProjectPage> {
-  // 2. Tambahkan Controller untuk setiap field
   final TextEditingController _namaProyekController = TextEditingController();
   final TextEditingController _namaPemesanController = TextEditingController();
   final TextEditingController _noHpController = TextEditingController();
@@ -22,13 +21,12 @@ class _AddProjectPageState extends State<AddProjectPage> {
 
   String? _pilihanPembayaran = "cash";
 
+  // Sesuaikan key agar sama dengan yang diharapkan di DetailPaymentPage
   List<Map<String, dynamic>> listBarang = [
-    {"nama": "", "harga": "", "jumlah": ""},
+    {"nama_barang": "", "harga": "", "qty": ""},
   ];
 
-  // 3. FUNGSI UTAMA: SIMPAN KE DATABASE
   Future<void> _simpanProyek() async {
-    // Validasi sederhana
     if (_namaProyekController.text.isEmpty ||
         _namaPemesanController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -38,7 +36,6 @@ class _AddProjectPageState extends State<AddProjectPage> {
     }
 
     try {
-      // Tampilkan loading
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -47,8 +44,14 @@ class _AddProjectPageState extends State<AddProjectPage> {
 
       final supabase = Supabase.instance.client;
 
+      // AMBIL ID USER YANG SEDANG LOGIN (Penting agar tidak error UUID)
+      final String? userId = supabase.auth.currentUser?.id;
+
+      if (userId == null) {
+        throw "User tidak terdeteksi. Silahkan login ulang.";
+      }
+
       // Kirim data ke tabel 'projects'
-      // Pastikan nama kolom di bawah ini SAMA PERSIS dengan di Supabase kamu
       await supabase.from('projects').insert({
         'nama_project': _namaProyekController.text,
         'nama_pemesan': _namaPemesanController.text,
@@ -57,17 +60,16 @@ class _AddProjectPageState extends State<AddProjectPage> {
         'tgl_buat': _tglBuatController.text,
         'tgl_jadi': _tglJadiController.text,
         'metode_bayar': _pilihanPembayaran,
-        'status_bayar': 'Belum Lunas', // Default
-        'progres_persen': 0, // Default
+        'status_bayar': 'Belum Lunas',
+        'progres_persen': 0,
         'deskripsi': _deskripsiController.text,
         'keterangan': _keteranganController.text,
-        'cust_id': 1, // Sementara hardcode ID 1, nanti ambil dari data login
+        'cust_id': userId, // MENGGUNAKAN UUID ASLI
+        'items': listBarang, // MENYIMPAN LIST BARANG KE KOLOM JSONB
       });
 
-      // Tutup loading
       if (mounted) Navigator.pop(context);
 
-      // Berhasil! Kembali ke dashboard
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Proyek berhasil ditambahkan!")),
@@ -75,12 +77,17 @@ class _AddProjectPageState extends State<AddProjectPage> {
         Navigator.pop(context);
       }
     } catch (e) {
-      if (mounted) Navigator.pop(context); // Tutup loading
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Gagal menyimpan: $e")));
+      if (mounted) Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Gagal menyimpan: $e"),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
+
+  // --- WIDGET HELPERS ---
 
   Future<void> _pilihTanggal(
     BuildContext context,
@@ -94,15 +101,13 @@ class _AddProjectPageState extends State<AddProjectPage> {
     );
     if (pickedDate != null) {
       String formattedDate = DateFormat('yyyy-MM-dd').format(pickedDate);
-      setState(() {
-        controller.text = formattedDate;
-      });
+      setState(() => controller.text = formattedDate);
     }
   }
 
   void _tambahBarisBarang() {
     setState(() {
-      listBarang.add({"nama": "", "harga": "", "jumlah": ""});
+      listBarang.add({"nama_barang": "", "harga": "", "qty": ""});
     });
   }
 
@@ -114,7 +119,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black, size: 30),
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
@@ -131,10 +136,9 @@ class _AddProjectPageState extends State<AddProjectPage> {
               "Proyek Baru",
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 5),
             const Text(
-              "Silahkan isi formulir pengerjaan proyek karoseri di bawah ini.",
-              style: TextStyle(fontSize: 14, color: Colors.black54),
+              "Isi formulir pengerjaan proyek karoseri di bawah ini.",
+              style: TextStyle(color: Colors.black54),
             ),
             const SizedBox(height: 30),
 
@@ -184,8 +188,6 @@ class _AddProjectPageState extends State<AddProjectPage> {
             _buildDropdownPembayaran(),
 
             const SizedBox(height: 30),
-
-            // ... Bagian Tabel Barang (tetap sama seperti punyamu) ...
             _tabelBarangWidget(),
 
             const SizedBox(height: 20),
@@ -196,15 +198,17 @@ class _AddProjectPageState extends State<AddProjectPage> {
             _kotakInput(controller: _keteranganController, lines: 3),
 
             const SizedBox(height: 40),
-
             SizedBox(
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
-                onPressed: _simpanProyek, // 4. Panggil fungsi simpan
+                onPressed: _simpanProyek,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFD4B07E),
                   foregroundColor: Colors.black,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
                 child: const Text(
                   "TAMBAH PROYEK",
@@ -219,11 +223,8 @@ class _AddProjectPageState extends State<AddProjectPage> {
     );
   }
 
-  // --- WIDGET HELPERS DENGAN CONTROLLER ---
-
   Widget _kotakInput({
     required TextEditingController controller,
-    String? hint,
     int lines = 1,
     TextInputType type = TextInputType.text,
   }) {
@@ -234,31 +235,23 @@ class _AddProjectPageState extends State<AddProjectPage> {
         borderRadius: BorderRadius.circular(4),
       ),
       child: TextField(
-        controller: controller, // Pasang controller di sini
+        controller: controller,
         keyboardType: type,
         maxLines: lines,
-        decoration: InputDecoration(
-          hintText: hint,
+        decoration: const InputDecoration(
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.all(10),
+          contentPadding: EdgeInsets.all(10),
         ),
       ),
     );
   }
-
-  // Widget helper lainnya (_labelInput, _buildDropdownPembayaran, _kotakInputTanggal, _tabelBarangWidget) tetap sama seperti kodenya...
-  // Pastikan memanggil variabel controller yang benar.
 
   Widget _labelInput(String text) {
     return Padding(
       padding: const EdgeInsets.only(top: 15, bottom: 5),
       child: Text(
         text.toUpperCase(),
-        style: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-          color: Colors.black87,
-        ),
+        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
       ),
     );
   }
@@ -325,10 +318,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
             children: [
               Container(
                 color: const Color(0xFFD4B07E),
-                padding: const EdgeInsets.symmetric(
-                  vertical: 12,
-                  horizontal: 10,
-                ),
+                padding: const EdgeInsets.all(10),
                 child: const Row(
                   children: [
                     Expanded(
@@ -365,87 +355,75 @@ class _AddProjectPageState extends State<AddProjectPage> {
                   ],
                 ),
               ),
-              Column(
-                children: listBarang.asMap().entries.map((entry) {
-                  int index = entry.key;
-                  return Container(
-                    decoration: BoxDecoration(
-                      color: index % 2 == 0 ? Colors.white : Colors.grey[50],
-                      border: const Border(
-                        top: BorderSide(color: Colors.black12),
+              ...listBarang.asMap().entries.map((entry) {
+                int index = entry.key;
+                return Container(
+                  decoration: BoxDecoration(
+                    color: index % 2 == 0 ? Colors.white : Colors.grey[100],
+                    border: const Border(
+                      top: BorderSide(color: Colors.black12),
+                    ),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: TextField(
+                          onChanged: (val) =>
+                              listBarang[index]['nama_barang'] = val,
+                          decoration: const InputDecoration(
+                            hintText: "...",
+                            border: InputBorder.none,
+                          ),
+                        ),
                       ),
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          flex: 3,
-                          child: TextField(
-                            decoration: const InputDecoration(
-                              hintText: "...",
-                              border: InputBorder.none,
-                            ),
-                            style: const TextStyle(fontSize: 13),
-                            onChanged: (val) => listBarang[index]['nama'] = val,
+                      Expanded(
+                        flex: 2,
+                        child: TextField(
+                          keyboardType: TextInputType.number,
+                          onChanged: (val) => listBarang[index]['harga'] = val,
+                          decoration: const InputDecoration(
+                            hintText: "0",
+                            border: InputBorder.none,
                           ),
                         ),
-                        Expanded(
-                          flex: 2,
-                          child: TextField(
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              hintText: "0",
-                              border: InputBorder.none,
-                            ),
-                            style: const TextStyle(fontSize: 13),
-                            onChanged: (val) =>
-                                listBarang[index]['harga'] = val,
+                      ),
+                      Expanded(
+                        flex: 1,
+                        child: TextField(
+                          textAlign: TextAlign.center,
+                          keyboardType: TextInputType.number,
+                          onChanged: (val) => listBarang[index]['qty'] = val,
+                          decoration: const InputDecoration(
+                            hintText: "0",
+                            border: InputBorder.none,
                           ),
                         ),
-                        Expanded(
-                          flex: 1,
-                          child: TextField(
-                            textAlign: TextAlign.center,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              hintText: "0",
-                              border: InputBorder.none,
-                            ),
-                            style: const TextStyle(fontSize: 13),
-                            onChanged: (val) =>
-                                listBarang[index]['jumlah'] = val,
-                          ),
+                      ),
+                      IconButton(
+                        icon: const Icon(
+                          Icons.remove_circle_outline,
+                          color: Colors.red,
+                          size: 20,
                         ),
-                        IconButton(
-                          icon: const Icon(
-                            Icons.remove_circle_outline,
-                            color: Colors.redAccent,
-                            size: 20,
-                          ),
-                          onPressed: () {
-                            if (listBarang.length > 1)
-                              setState(() => listBarang.removeAt(index));
-                          },
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList(),
-              ),
+                        onPressed: () {
+                          if (listBarang.length > 1)
+                            setState(() => listBarang.removeAt(index));
+                        },
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
             ],
           ),
         ),
-        Align(
-          alignment: Alignment.centerRight,
-          child: ElevatedButton.icon(
-            onPressed: _tambahBarisBarang,
-            icon: const Icon(Icons.add, size: 18),
-            label: const Text("Tambah Baris"),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFD4B07E),
-              foregroundColor: Colors.black,
-            ),
-          ),
+        TextButton.icon(
+          onPressed: _tambahBarisBarang,
+          icon: const Icon(Icons.add),
+          label: const Text("Tambah Baris"),
+          style: TextButton.styleFrom(foregroundColor: const Color(0xFFD4B07E)),
         ),
       ],
     );
