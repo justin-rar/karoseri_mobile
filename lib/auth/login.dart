@@ -1,9 +1,9 @@
 // Di bagian atas login_page.dart
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:karoseri_mobile/features/dashboard/dashboard_page.dart'; // Import file dashboard admin
-import 'package:karoseri_mobile/features/dashboard/dashboard_direktur.dart'; // Import file dashboard direktur
-import 'package:karoseri_mobile/features/dashboard/dashboard_cust.dart'; // Import file dashboard direktur
+import 'package:karoseri_mobile/dashboard/manager/dashboard_page.dart'; // Import file dashboard admin
+import 'package:karoseri_mobile/dashboard/direktur/dashboard_direktur.dart'; // Import file dashboard direktur
+import 'package:karoseri_mobile/dashboard/customer/dashboard_cust.dart'; // Import file dashboard direktur
 import 'user.dart';
 import 'regist.dart';
 

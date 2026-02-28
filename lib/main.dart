@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:karoseri_mobile/auth/login.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'features/dashboard/dashboard_page.dart';
+import 'dashboard/manager/dashboard_page.dart';
 
 Future main() async {
   WidgetsFlutterBinding.ensureInitialized();

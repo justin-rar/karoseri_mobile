@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
 // Import halaman tujuan sesuai struktur foldermu
-import '../project/add_project_page.dart';
-import '../inventory/inventory_page.dart';
-import '../progress/update_progress_page.dart';
-import '../payment/payment_page.dart';
+import 'features/project/add_project_page.dart';
+import 'features/inventory/inventory_page.dart';
+import 'features/progress/update_progress_page.dart';
+import 'features/payment/payment_page.dart';
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
