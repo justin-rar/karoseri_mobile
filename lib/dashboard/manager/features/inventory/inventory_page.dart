@@ -11,22 +11,20 @@ class InventoryPage extends StatefulWidget {
 class _InventoryPageState extends State<InventoryPage> {
   final supabase = Supabase.instance.client;
 
-  // List untuk baris input baru
   List<Map<String, dynamic>> listBarang = [
     {"nama": "", "jumlah": ""},
   ];
 
-  // List untuk menampung data yang ditarik dari database
   List<dynamic> inventoryData = [];
   bool isLoadingData = true;
 
   @override
   void initState() {
     super.initState();
-    _ambilDataDariDatabase(); // Ambil data saat halaman pertama kali dibuka
+    _ambilDataDariDatabase();
   }
 
-  // --- 1. FUNGSI AMBIL DATA DARI DATABASE ---
+  // --- 1. AMBIL DATA ---
   Future<void> _ambilDataDariDatabase() async {
     try {
       final data = await supabase
@@ -44,7 +42,7 @@ class _InventoryPageState extends State<InventoryPage> {
     }
   }
 
-  // --- 2. FUNGSI SIMPAN INPUT BARU KE DATABASE ---
+  // --- 2. SIMPAN DATA BARU ---
   Future<void> _simpanKeDatabase() async {
     try {
       showDialog(
@@ -73,7 +71,10 @@ class _InventoryPageState extends State<InventoryPage> {
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Stok Berhasil Disimpan!")),
+          const SnackBar(
+            content: Text("Stok Berhasil Disimpan!"),
+            backgroundColor: Colors.green,
+          ),
         );
 
         setState(() {
@@ -92,36 +93,67 @@ class _InventoryPageState extends State<InventoryPage> {
     }
   }
 
-  // --- 3. FUNGSI UPDATE STOK (PLUS / MINUS) ---
+  // --- 3. UPDATE STOK ---
   Future<void> _updateStok(int id, int stokBaru) async {
-    if (stokBaru < 0) return; // Validasi minimal 0 unit
-
+    if (stokBaru < 0) return;
     try {
       await supabase.from('inventory').update({'stok': stokBaru}).eq('id', id);
-
-      // Refresh data tanpa loading berat agar smooth
       _ambilDataDariDatabase();
     } catch (e) {
-      debugPrint("Error update stok: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("Gagal update: $e")));
+      debugPrint("Error update: $e");
+    }
+  }
+
+  // --- 4. HAPUS DATA DARI DATABASE (Error Handling) ---
+  Future<void> _hapusDataDariDatabase(int id, String nama) async {
+    // Tampilkan konfirmasi dulu biar gak asal hapus
+    bool konfirmasi =
+        await showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text("Hapus Barang?"),
+            content: Text(
+              "Apakah kamu yakin ingin menghapus '$nama' dari database?",
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text("BATAL"),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text("HAPUS", style: TextStyle(color: Colors.red)),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (konfirmasi) {
+      try {
+        await supabase.from('inventory').delete().eq('id', id);
+        _ambilDataDariDatabase(); // Refresh list
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Data berhasil dihapus"),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+      } catch (e) {
+        debugPrint("Error hapus: $e");
       }
     }
   }
 
   void _tambahBaris() {
-    setState(() {
-      listBarang.add({"nama": "", "jumlah": ""});
-    });
+    setState(() => listBarang.add({"nama": "", "jumlah": ""}));
   }
 
-  void _hapusBaris(int index) {
+  void _hapusBarisInput(int index) {
     if (listBarang.length > 1) {
-      setState(() {
-        listBarang.removeAt(index);
-      });
+      setState(() => listBarang.removeAt(index));
     }
   }
 
@@ -266,7 +298,7 @@ class _InventoryPageState extends State<InventoryPage> {
                             color: Colors.red,
                             size: 20,
                           ),
-                          onPressed: () => _hapusBaris(index),
+                          onPressed: () => _hapusBarisInput(index),
                         ),
                       ],
                     ),
@@ -312,6 +344,7 @@ class _InventoryPageState extends State<InventoryPage> {
         children: inventoryData.map((item) {
           int currentStok = int.tryParse(item['stok'].toString()) ?? 0;
           int id = item['id'];
+          String nama = item['nama_barang'];
 
           return Container(
             padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
@@ -319,14 +352,13 @@ class _InventoryPageState extends State<InventoryPage> {
               border: Border(bottom: BorderSide(color: Colors.black12)),
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        item['nama_barang'].toString(),
+                        nama,
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
@@ -350,25 +382,11 @@ class _InventoryPageState extends State<InventoryPage> {
                         color: currentStok > 0 ? Colors.red : Colors.grey,
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.blueGrey[50],
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: Colors.blueGrey.withOpacity(0.2),
-                        ),
-                      ),
-                      child: Text(
-                        "$currentStok",
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          color: Colors.blueGrey,
-                        ),
+                    Text(
+                      "$currentStok",
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
                       ),
                     ),
                     IconButton(
@@ -376,6 +394,14 @@ class _InventoryPageState extends State<InventoryPage> {
                       icon: const Icon(
                         Icons.add_circle_outline,
                         color: Colors.green,
+                      ),
+                    ),
+                    // TOMBOL HAPUS DATABASE (ERROR HANDLING)
+                    IconButton(
+                      onPressed: () => _hapusDataDariDatabase(id, nama),
+                      icon: const Icon(
+                        Icons.delete_forever,
+                        color: Colors.redAccent,
                       ),
                     ),
                   ],
