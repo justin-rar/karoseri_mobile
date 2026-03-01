@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // Tambahkan ini untuk TextInputFormatter
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -7,6 +8,33 @@ class AddProjectPage extends StatefulWidget {
 
   @override
   State<AddProjectPage> createState() => _AddProjectPageState();
+}
+
+// Formatter kustom untuk menambahkan titik
+class ThousandsSeparatorInputFormatter extends TextInputFormatter {
+  static const separator = '.';
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (newValue.text.isEmpty) return newValue;
+
+    // Hapus semua karakter selain angka
+    String newText = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+
+    // Format angka dengan titik
+    final formatter = NumberFormat.decimalPattern('id');
+    String formattedText = formatter
+        .format(int.parse(newText))
+        .replaceAll(',', '.');
+
+    return newValue.copyWith(
+      text: formattedText,
+      selection: TextSelection.collapsed(offset: formattedText.length),
+    );
+  }
 }
 
 class _AddProjectPageState extends State<AddProjectPage> {
@@ -21,9 +49,14 @@ class _AddProjectPageState extends State<AddProjectPage> {
 
   String? _pilihanPembayaran = "cash";
 
-  // Sesuaikan key agar sama dengan yang diharapkan di DetailPaymentPage
+  // Kita buat List of Controllers untuk menghandle harga per baris agar tidak bentrok
   List<Map<String, dynamic>> listBarang = [
-    {"nama_barang": "", "harga": "", "qty": ""},
+    {
+      "nama_barang": "",
+      "harga": "",
+      "qty": "",
+      "controller": TextEditingController(),
+    },
   ];
 
   Future<void> _simpanProyek() async {
@@ -43,15 +76,19 @@ class _AddProjectPageState extends State<AddProjectPage> {
       );
 
       final supabase = Supabase.instance.client;
-
-      // AMBIL ID USER YANG SEDANG LOGIN (Penting agar tidak error UUID)
       final String? userId = supabase.auth.currentUser?.id;
 
-      if (userId == null) {
-        throw "User tidak terdeteksi. Silahkan login ulang.";
-      }
+      if (userId == null) throw "User tidak terdeteksi. Silahkan login ulang.";
 
-      // Kirim data ke tabel 'projects'
+      // Bersihkan titik dari harga sebelum simpan ke Database (biar jadi angka murni)
+      List<Map<String, dynamic>> itemsToSave = listBarang.map((item) {
+        return {
+          "nama_barang": item["nama_barang"],
+          "harga": item["harga"].toString().replaceAll('.', ''), // Hapus titik
+          "qty": item["qty"],
+        };
+      }).toList();
+
       await supabase.from('projects').insert({
         'nama_project': _namaProyekController.text,
         'nama_pemesan': _namaPemesanController.text,
@@ -64,11 +101,11 @@ class _AddProjectPageState extends State<AddProjectPage> {
         'progres_persen': 0,
         'deskripsi': _deskripsiController.text,
         'keterangan': _keteranganController.text,
-        'cust_id': userId, // MENGGUNAKAN UUID ASLI
-        'items': listBarang, // MENYIMPAN LIST BARANG KE KOLOM JSONB
+        'cust_id': userId,
+        'items': itemsToSave,
       });
 
-      if (mounted) Navigator.pop(context);
+      if (mounted) Navigator.pop(context); // Tutup loading
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -86,8 +123,6 @@ class _AddProjectPageState extends State<AddProjectPage> {
       );
     }
   }
-
-  // --- WIDGET HELPERS ---
 
   Future<void> _pilihTanggal(
     BuildContext context,
@@ -107,8 +142,23 @@ class _AddProjectPageState extends State<AddProjectPage> {
 
   void _tambahBarisBarang() {
     setState(() {
-      listBarang.add({"nama_barang": "", "harga": "", "qty": ""});
+      listBarang.add({
+        "nama_barang": "",
+        "harga": "",
+        "qty": "",
+        "controller":
+            TextEditingController(), // Controller baru untuk baris baru
+      });
     });
+  }
+
+  @override
+  void dispose() {
+    // Bersihkan semua controller agar tidak memory leak
+    for (var item in listBarang) {
+      item['controller'].dispose();
+    }
+    super.dispose();
   }
 
   @override
@@ -223,6 +273,18 @@ class _AddProjectPageState extends State<AddProjectPage> {
     );
   }
 
+  // --- WIDGET HELPERS ---
+
+  Widget _labelInput(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 15, bottom: 5),
+      child: Text(
+        text.toUpperCase(),
+        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
   Widget _kotakInput({
     required TextEditingController controller,
     int lines = 1,
@@ -242,16 +304,6 @@ class _AddProjectPageState extends State<AddProjectPage> {
           border: InputBorder.none,
           contentPadding: EdgeInsets.all(10),
         ),
-      ),
-    );
-  }
-
-  Widget _labelInput(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 15, bottom: 5),
-      child: Text(
-        text.toUpperCase(),
-        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
       ),
     );
   }
@@ -367,6 +419,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
                   padding: const EdgeInsets.symmetric(horizontal: 10),
                   child: Row(
                     children: [
+                      // NAMA BARANG
                       Expanded(
                         flex: 3,
                         child: TextField(
@@ -378,17 +431,27 @@ class _AddProjectPageState extends State<AddProjectPage> {
                           ),
                         ),
                       ),
+                      // HARGA (DENGAN TITIK)
                       Expanded(
                         flex: 2,
                         child: TextField(
+                          controller:
+                              listBarang[index]['controller'], // Pakai controller khusus
                           keyboardType: TextInputType.number,
-                          onChanged: (val) => listBarang[index]['harga'] = val,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            ThousandsSeparatorInputFormatter(), // Formatter titik kita
+                          ],
+                          onChanged: (val) {
+                            listBarang[index]['harga'] = val;
+                          },
                           decoration: const InputDecoration(
                             hintText: "0",
                             border: InputBorder.none,
                           ),
                         ),
                       ),
+                      // QTY
                       Expanded(
                         flex: 1,
                         child: TextField(
@@ -408,8 +471,9 @@ class _AddProjectPageState extends State<AddProjectPage> {
                           size: 20,
                         ),
                         onPressed: () {
-                          if (listBarang.length > 1)
+                          if (listBarang.length > 1) {
                             setState(() => listBarang.removeAt(index));
+                          }
                         },
                       ),
                     ],
