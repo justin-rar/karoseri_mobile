@@ -69,14 +69,14 @@ class _DetailProgressPageState extends State<DetailProgressPage> {
   @override
   void initState() {
     super.initState();
-    // Inisialisasi status progres
+    // Inisialisasi status progres dari data yang diterima
     progressStatus = {
       for (var t in tahapan)
         t['key']!:
             widget.projectData[t['key']]?.toString() ?? 'Belum dikerjakan',
     };
 
-    // Ambil data foto lama (asumsikan database menyimpan array)
+    // Ambil data foto lama
     if (widget.projectData['foto_url'] != null) {
       if (widget.projectData['foto_url'] is List) {
         existingUrls = List<String>.from(widget.projectData['foto_url']);
@@ -86,7 +86,6 @@ class _DetailProgressPageState extends State<DetailProgressPage> {
     }
   }
 
-  // Fungsi pilih banyak gambar
   Future<void> _pickMultiImages() async {
     final List<XFile> picked = await ImagePicker().pickMultiImage(
       imageQuality: 50,
@@ -105,13 +104,10 @@ class _DetailProgressPageState extends State<DetailProgressPage> {
     try {
       List<String> allUrls = [...existingUrls];
 
-      // Upload file-file baru satu per satu
       for (var image in selectedImages) {
         final fileExt = image.name.split('.').last;
         final fileName =
             'img_${projectId}_${DateTime.now().microsecondsSinceEpoch}.$fileExt';
-
-        // Baca file sebagai bytes agar support WEB
         final bytes = await image.readAsBytes();
 
         await supabase.storage
@@ -128,7 +124,6 @@ class _DetailProgressPageState extends State<DetailProgressPage> {
         allUrls.add(url);
       }
 
-      // Update tabel dengan ARRAY of URLs
       await supabase
           .from('projects')
           .update({
@@ -139,14 +134,14 @@ class _DetailProgressPageState extends State<DetailProgressPage> {
             'tahap_5': progressStatus['tahap_5'],
             'tahap_6': progressStatus['tahap_6'],
             'tahap_7': progressStatus['tahap_7'],
-            'foto_url': allUrls, // Mengirim List/Array
+            'foto_url': allUrls,
           })
           .eq('id_project', projectId);
 
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("Berhasil Update!")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Berhasil Update Progress! ✅")),
+        );
         Navigator.pop(context, true);
       }
     } catch (e) {
@@ -162,25 +157,87 @@ class _DetailProgressPageState extends State<DetailProgressPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Detail Update Multi-Photo")),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text(
+          "Detail Update Progress",
+          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.black),
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ...tahapan.map(
-              (t) => _buildStepCard(t['judul']!, t['sub']!, t['key']!),
-            ),
-            const SizedBox(height: 20),
-            const Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                "DOKUMENTASI FOTO",
-                style: TextStyle(fontWeight: FontWeight.bold),
+            // --- HEADER INFO PROJECT (JUDUL, PEMESAN, DESKRIPSI) ---
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(15),
+              decoration: BoxDecoration(
+                color: const Color(0xFFD4B07E),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.black12),
               ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.projectData['nama_project']
+                            ?.toString()
+                            .toUpperCase() ??
+                        "PROJECT",
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
+                  const Divider(color: Colors.black26),
+                  Row(
+                    children: [
+                      const Icon(Icons.person, size: 16),
+                      const SizedBox(width: 8),
+                      Text(
+                        "Pemesan: ${widget.projectData['nama_pemesan'] ?? '-'}",
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.projectData['deskripsi'] ?? "Tidak ada deskripsi.",
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Colors.black87,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 25),
+            const Text(
+              "STATUS TAHAPAN",
+              style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.1),
             ),
             const SizedBox(height: 10),
 
-            // Grid View untuk menampilkan banyak foto
+            // List Tahapan
+            ...tahapan.map(
+              (t) => _buildStepCard(t['judul']!, t['sub']!, t['key']!),
+            ),
+
+            const SizedBox(height: 25),
+            const Text(
+              "DOKUMENTASI FOTO",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 10),
+
+            // Grid Foto
             GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -203,21 +260,15 @@ class _DetailProgressPageState extends State<DetailProgressPage> {
                     ),
                   );
                 }
-
-                int adjustedIndex = index - 1;
-                if (adjustedIndex < existingUrls.length) {
-                  // Foto dari Database
-                  return _buildImageItem(
-                    existingUrls[adjustedIndex],
-                    isNetwork: true,
-                  );
+                int adjIdx = index - 1;
+                if (adjIdx < existingUrls.length) {
+                  return _buildImageItem(existingUrls[adjIdx], isNetwork: true);
                 } else {
-                  // Foto yang baru dipilih (Preview)
-                  int fileIndex = adjustedIndex - existingUrls.length;
+                  int fileIdx = adjIdx - existingUrls.length;
                   return _buildImageItem(
-                    selectedImages[fileIndex].path,
+                    selectedImages[fileIdx].path,
                     isNetwork: false,
-                    file: selectedImages[fileIndex],
+                    file: selectedImages[fileIdx],
                   );
                 }
               },
@@ -231,10 +282,17 @@ class _DetailProgressPageState extends State<DetailProgressPage> {
                 onPressed: isLoading ? null : _updateProgress,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFD4B07E),
+                  foregroundColor: Colors.black,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
                 child: isLoading
-                    ? const CircularProgressIndicator()
-                    : const Text("SIMPAN SEMUA"),
+                    ? const CircularProgressIndicator(color: Colors.black)
+                    : const Text(
+                        "SIMPAN SEMUA DATA",
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
               ),
             ),
           ],
@@ -261,7 +319,7 @@ class _DetailProgressPageState extends State<DetailProgressPage> {
                         fit: BoxFit.cover,
                         width: double.infinity,
                         height: double.infinity,
-                      ) // Image.network di web support blob path
+                      )
                     : Image.file(
                         File(path),
                         fit: BoxFit.cover,
@@ -270,17 +328,15 @@ class _DetailProgressPageState extends State<DetailProgressPage> {
                       )),
         ),
         Positioned(
-          right: 0,
-          top: 0,
+          right: 2,
+          top: 2,
           child: GestureDetector(
-            onTap: () {
-              setState(() {
-                if (isNetwork)
-                  existingUrls.remove(path);
-                else
-                  selectedImages.remove(file);
-              });
-            },
+            onTap: () => setState(() {
+              if (isNetwork)
+                existingUrls.remove(path);
+              else
+                selectedImages.remove(file);
+            }),
             child: const CircleAvatar(
               radius: 12,
               backgroundColor: Colors.red,
@@ -295,18 +351,33 @@ class _DetailProgressPageState extends State<DetailProgressPage> {
   Widget _buildStepCard(String judul, String sub, String key) {
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       child: ListTile(
         title: Text(
           judul,
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
         ),
-        subtitle: DropdownButton<String>(
-          value: progressStatus[key],
-          isExpanded: true,
-          items: statusOptions
-              .map((s) => DropdownMenuItem(value: s, child: Text(s)))
-              .toList(),
-          onChanged: (val) => setState(() => progressStatus[key] = val!),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(sub, style: const TextStyle(fontSize: 12)),
+            const SizedBox(height: 5),
+            DropdownButton<String>(
+              value: progressStatus[key],
+              isExpanded: true,
+              underline: Container(height: 1, color: const Color(0xFFD4B07E)),
+              items: statusOptions
+                  .map(
+                    (s) => DropdownMenuItem(
+                      value: s,
+                      child: Text(s, style: const TextStyle(fontSize: 13)),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (val) => setState(() => progressStatus[key] = val!),
+            ),
+          ],
         ),
       ),
     );
