@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:intl/intl.dart'; // Wajib untuk format angka 20.000
 
 class DetailPaymentPage extends StatefulWidget {
   final Map<String, dynamic> project;
@@ -13,6 +14,15 @@ class _DetailPaymentPageState extends State<DetailPaymentPage> {
   final supabase = Supabase.instance.client;
   final profitController = TextEditingController();
 
+  // Helper: Format angka ke Rupiah dengan titik (Contoh: 20.000)
+  String formatIDR(dynamic nominal) {
+    return NumberFormat.currency(
+      locale: 'id',
+      symbol: 'Rp ',
+      decimalDigits: 0,
+    ).format(nominal);
+  }
+
   List<dynamic> items = [];
   double subtotal = 0;
   double profitPercent = 0;
@@ -22,9 +32,17 @@ class _DetailPaymentPageState extends State<DetailPaymentPage> {
   @override
   void initState() {
     super.initState();
-    // Sesuaikan 'items' dengan nama kolom di tabel kamu (misal: 'bahan_baku')
+    // Mengambil data barang dari kolom 'items' di database
     items = widget.project['items'] ?? [];
     _calculateSubtotal();
+
+    // Inisialisasi profit jika sudah ada di database sebelumnya
+    if (widget.project['profit_percentage'] != null) {
+      profitPercent =
+          double.tryParse(widget.project['profit_percentage'].toString()) ?? 0;
+      profitController.text = profitPercent.toString();
+      _calculateTotal();
+    }
   }
 
   void _calculateSubtotal() {
@@ -55,20 +73,29 @@ class _DetailPaymentPageState extends State<DetailPaymentPage> {
           .update({
             'profit_percentage': profitPercent,
             'total_tagihan': totalTagihan,
+            'status_bayar': 'Menunggu Pembayaran',
           })
           .eq('id_project', widget.project['id_project']);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text("Tagihan Berhasil Dikonfirmasi!"),
+            content: Text("Tagihan Berhasil Dikonfirmasi! ✅"),
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.pop(context, true);
+        Navigator.pop(context, true); // Kembali dan refresh list
       }
     } catch (e) {
-      debugPrint("Error: $e");
+      debugPrint("Error Update: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Gagal simpan: $e"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
@@ -79,13 +106,13 @@ class _DetailPaymentPageState extends State<DetailPaymentPage> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        // SUDAH DIPERBAIKI (Bukan app_appBar)
         title: const Text(
           "Lihat Tagihan",
           style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.white,
         elevation: 0,
+        centerTitle: false,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
           onPressed: () => Navigator.pop(context),
@@ -95,10 +122,10 @@ class _DetailPaymentPageState extends State<DetailPaymentPage> {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            // Bagian Atas: Info Proyek (Warna Krem)
+            // BAGIAN ATAS: INFO PROYEK & CUSTOMER (KREM)
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(15),
+              padding: const EdgeInsets.all(18),
               decoration: const BoxDecoration(
                 color: Color(0xFFD4B07E),
                 borderRadius: BorderRadius.only(
@@ -117,32 +144,52 @@ class _DetailPaymentPageState extends State<DetailPaymentPage> {
                       fontSize: 18,
                     ),
                   ),
+                  const Divider(color: Colors.black26, thickness: 1),
                   const SizedBox(height: 5),
+
+                  // Menampilkan Nama Pemesan (Tata dll)
+                  _buildCustomerInfo(
+                    Icons.person,
+                    "Pemesan",
+                    widget.project['nama_pemesan'],
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Menampilkan Nomor Telepon
+                  _buildCustomerInfo(
+                    Icons.phone,
+                    "Telepon",
+                    widget.project['no_hp'],
+                  ),
+
+                  const SizedBox(height: 12),
                   Text(
-                    widget.project['deskripsi'] ?? "Tanpa deskripsi",
-                    style: const TextStyle(fontSize: 12),
+                    widget.project['deskripsi'] ?? "Tanpa deskripsi proyek.",
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.black87,
+                      fontStyle: FontStyle.italic,
+                    ),
                   ),
                 ],
               ),
             ),
 
-            // Bagian Bawah: List Barang & Kalkulasi (Warna Abu-abu)
+            // BAGIAN BAWAH: RINCIAN BIAYA (ABU-ABU)
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(15),
-              decoration: BoxDecoration(
-                color: const Color(0xFFD9D9D9),
-                borderRadius: const BorderRadius.only(
+              padding: const EdgeInsets.all(18),
+              decoration: const BoxDecoration(
+                color: Color(0xFFD9D9D9),
+                borderRadius: BorderRadius.only(
                   bottomLeft: Radius.circular(15),
                   bottomRight: Radius.circular(15),
                 ),
               ),
               child: Column(
                 children: [
-                  // Header Tabel
+                  // Tabel Header
                   const Row(
-                    mainAxisAlignment:
-                        MainAxisAlignment.spaceBetween, // SUDAH DIPERBAIKI
                     children: [
                       Expanded(
                         flex: 3,
@@ -169,22 +216,21 @@ class _DetailPaymentPageState extends State<DetailPaymentPage> {
                       ),
                     ],
                   ),
-                  const Divider(color: Colors.black),
+                  const Divider(color: Colors.black54),
 
-                  // List Barang
+                  // List Barang dari Database
                   items.isEmpty
                       ? const Padding(
-                          padding: EdgeInsets.all(10),
-                          child: Text("Data barang tidak ada"),
+                          padding: EdgeInsets.all(15),
+                          child: Text("Belum ada data barang"),
                         )
                       : Column(
                           children: items.map((item) {
                             double harga =
                                 double.tryParse(item['harga'].toString()) ?? 0;
                             int qty = int.tryParse(item['qty'].toString()) ?? 0;
-                            double lineTotal = harga * qty;
                             return Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              padding: const EdgeInsets.symmetric(vertical: 6),
                               child: Row(
                                 children: [
                                   Expanded(
@@ -201,7 +247,7 @@ class _DetailPaymentPageState extends State<DetailPaymentPage> {
                                   Expanded(
                                     flex: 2,
                                     child: Text(
-                                      "Rp ${lineTotal.toStringAsFixed(0)}",
+                                      formatIDR(harga * qty),
                                       textAlign: TextAlign.right,
                                     ),
                                   ),
@@ -211,15 +257,12 @@ class _DetailPaymentPageState extends State<DetailPaymentPage> {
                           }).toList(),
                         ),
 
-                  const Divider(color: Colors.black),
+                  const Divider(color: Colors.black54),
+                  const SizedBox(height: 10),
 
-                  // Perhitungan
-                  const SizedBox(height: 10),
-                  _buildRowInfo(
-                    "Subtotal Pokok",
-                    "Rp ${subtotal.toStringAsFixed(0)}",
-                  ),
-                  const SizedBox(height: 10),
+                  // Kalkulasi
+                  _buildRowBiaya("Subtotal Pokok", formatIDR(subtotal)),
+                  const SizedBox(height: 12),
 
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -231,14 +274,23 @@ class _DetailPaymentPageState extends State<DetailPaymentPage> {
                       Row(
                         children: [
                           SizedBox(
-                            width: 50,
+                            width: 60,
                             child: TextField(
                               controller: profitController,
                               keyboardType: TextInputType.number,
                               textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
                               decoration: const InputDecoration(
                                 isDense: true,
-                                contentPadding: EdgeInsets.all(5),
+                                contentPadding: EdgeInsets.symmetric(
+                                  vertical: 8,
+                                  horizontal: 5,
+                                ),
+                                border: OutlineInputBorder(),
+                                fillColor: Colors.white,
+                                filled: true,
                               ),
                               onChanged: (val) {
                                 setState(() {
@@ -248,19 +300,23 @@ class _DetailPaymentPageState extends State<DetailPaymentPage> {
                               },
                             ),
                           ),
-                          const Text(" %"),
+                          const Text(
+                            " %",
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
                         ],
                       ),
                     ],
                   ),
                   const SizedBox(height: 20),
 
-                  // Total Tagihan Akhir
+                  // TOTAL AKHIR
                   Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(15),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.blue.shade200),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -269,14 +325,14 @@ class _DetailPaymentPageState extends State<DetailPaymentPage> {
                           "TOTAL TAGIHAN:",
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                            fontSize: 15,
                           ),
                         ),
                         Text(
-                          "Rp ${totalTagihan.toStringAsFixed(0)}",
+                          formatIDR(totalTagihan),
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                            fontSize: 17,
                             color: Colors.blue,
                           ),
                         ),
@@ -284,22 +340,24 @@ class _DetailPaymentPageState extends State<DetailPaymentPage> {
                     ),
                   ),
 
-                  const SizedBox(height: 25),
+                  const SizedBox(height: 30),
 
-                  // Tombol Konfirmasi (Warna Hijau stabilo sesuai gambar lo)
+                  // TOMBOL KONFIRMASI
                   Align(
                     alignment: Alignment.centerRight,
                     child: ElevatedButton(
                       onPressed: isLoading ? null : _simpanTagihan,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(
-                          0xFF00FF00,
-                        ), // Hijau sesuai gambar
+                        backgroundColor: const Color(0xFF00FF00),
                         foregroundColor: Colors.black,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(5),
+                        elevation: 3,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 40,
+                          vertical: 12,
                         ),
-                        padding: const EdgeInsets.symmetric(horizontal: 30),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                       child: isLoading
                           ? const SizedBox(
@@ -311,8 +369,11 @@ class _DetailPaymentPageState extends State<DetailPaymentPage> {
                               ),
                             )
                           : const Text(
-                              "konfirmasi",
-                              style: TextStyle(fontWeight: FontWeight.bold),
+                              "KONFIRMASI",
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.1,
+                              ),
                             ),
                     ),
                   ),
@@ -325,12 +386,31 @@ class _DetailPaymentPageState extends State<DetailPaymentPage> {
     );
   }
 
-  Widget _buildRowInfo(String label, String value) {
+  // Widget Helper untuk Baris Info Customer
+  Widget _buildCustomerInfo(IconData icon, String label, dynamic value) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: Colors.black54),
+        const SizedBox(width: 8),
+        Text(
+          "$label: ",
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+        ),
+        Text(
+          value?.toString() ?? "-",
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+        ),
+      ],
+    );
+  }
+
+  // Widget Helper untuk Baris Biaya
+  Widget _buildRowBiaya(String label, String value) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
-        Text(value),
+        Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
       ],
     );
   }

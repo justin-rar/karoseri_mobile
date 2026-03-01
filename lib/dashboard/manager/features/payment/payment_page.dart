@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+// 1. PASTIKAN IMPORT INI ADA (sesuaikan dengan nama file detail kamu)
+import 'detail_payment_page.dart';
 
 class PaymentPage extends StatefulWidget {
   const PaymentPage({super.key});
@@ -19,7 +21,6 @@ class _PaymentPageState extends State<PaymentPage> {
     _fetchProjects();
   }
 
-  // Mengambil data project dari database Supabase
   Future<void> _fetchProjects() async {
     try {
       final data = await supabase
@@ -66,63 +67,90 @@ class _PaymentPageState extends State<PaymentPage> {
             )
           : projects.isEmpty
           ? const Center(child: Text("Data project tidak ditemukan."))
-          : ListView.builder(
-              padding: const EdgeInsets.all(20),
-              itemCount: projects.length,
-              itemBuilder: (context, index) {
-                final project = projects[index];
+          : RefreshIndicator(
+              // Ditambah agar bisa tarik bawah untuk refresh
+              onRefresh: _fetchProjects,
+              child: ListView.builder(
+                padding: const EdgeInsets.all(20),
+                itemCount: projects.length,
+                itemBuilder: (context, index) {
+                  final project = projects[index];
+                  final bool isEven = index % 2 == 0;
+                  final Color cardColor = isEven
+                      ? const Color(0xFFD9D9D9)
+                      : const Color(0xFFD4B07E);
 
-                // Logika warna selang-seling sesuai screenshot
-                // Index genap (0, 2, 4) = Abu-abu terang
-                // Index ganjil (1, 3, 5) = Krem/Coklat muda
-                final bool isEven = index % 2 == 0;
-                final Color cardColor = isEven
-                    ? const Color(0xFFD9D9D9)
-                    : const Color(0xFFD4B07E);
-
-                return GestureDetector(
-                  onTap: () {
-                    // Navigasi ke halaman detail pembayaran (akan kita buat nanti)
-                    print("Klik Project: ${project['nama_project']}");
-                  },
-                  child: Container(
-                    width: double.infinity,
-                    margin: const EdgeInsets.only(bottom: 20),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 25,
-                    ),
-                    decoration: BoxDecoration(
-                      color: cardColor,
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          project['nama_project']?.toString().toUpperCase() ??
-                              "NAMA-PROJECT",
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.2,
-                          ),
+                  return GestureDetector(
+                    onTap: () {
+                      // 2. BAGIAN INI SUDAH DIPERBAIKI UNTUK NAVIGASI
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              DetailPaymentPage(project: project),
                         ),
-                        const SizedBox(height: 10),
-                        Text(
-                          project['deskripsi']?.toString() ??
-                              "Deskripsi project tidak tersedia saat ini.",
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Colors.black87,
-                            height: 1.4,
+                      ).then((value) {
+                        // Jika kembali dari detail dan ada perubahan, refresh data
+                        if (value == true) _fetchProjects();
+                      });
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: 20),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 25,
+                      ),
+                      decoration: BoxDecoration(
+                        color: cardColor,
+                        borderRadius: BorderRadius.circular(15),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 5,
+                            offset: const Offset(0, 2),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                project['nama_project']
+                                        ?.toString()
+                                        .toUpperCase() ??
+                                    "NAMA-PROJECT",
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1.2,
+                                ),
+                              ),
+                              const Icon(
+                                Icons.chevron_right,
+                                color: Colors.black45,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            project['deskripsi']?.toString() ??
+                                "Deskripsi project tidak tersedia saat ini.",
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Colors.black87,
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
     );
   }
