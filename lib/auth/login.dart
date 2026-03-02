@@ -50,7 +50,7 @@ class _LoginPageState extends State<LoginPage> {
   //     } else {
   //       Navigator.pushReplacement(
   //         context,
-  //         MaterialPageRoute(builder: (context) => const DashboardCustomer()),
+  //         MaterialPageRoute(builder: (context) => const DashboardCust()),
   //       );
   //     }
   //   } catch (e) {
@@ -104,7 +104,7 @@ class _LoginPageState extends State<LoginPage> {
       } else {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const DashboardCustomer()),
+          MaterialPageRoute(builder: (context) => const DashboardCust()),
         );
       }
     } catch (e) {
