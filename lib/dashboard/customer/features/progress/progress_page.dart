@@ -82,11 +82,12 @@ class _ProgressPageState extends State<ProgressPage> {
 
                   return GestureDetector(
                     onTap: () {
+                      final dataProyek = project[index];
                       Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (context) =>
-                              DetailProgressPage(project: project),
+                              DetailProgressPage(project: dataProyek),
                         ),
                       );
                     },
