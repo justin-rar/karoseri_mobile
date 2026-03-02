@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-// 1. PASTIKAN IMPORT INI ADA (sesuaikan dengan nama file detail kamu)
 import 'detail_payment_page.dart';
 
 class PaymentPage extends StatefulWidget {
@@ -23,15 +22,24 @@ class _PaymentPageState extends State<PaymentPage> {
 
   Future<void> _fetchProjects() async {
     try {
+      if (mounted) setState(() => isLoading = true);
+
+      // FILTER TAMBAHAN: Hanya ambil yang is_completed = false
       final data = await supabase
           .from('projects')
           .select()
+          .eq(
+            'is_completed',
+            false,
+          ) // Agar project yang sudah SELESAI tidak muncul lagi
           .order('nama_project', ascending: true);
 
-      setState(() {
-        projects = List<Map<String, dynamic>>.from(data);
-        isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          projects = List<Map<String, dynamic>>.from(data);
+          isLoading = false;
+        });
+      }
     } catch (e) {
       debugPrint("Error fetching projects: $e");
       if (mounted) {
@@ -66,9 +74,8 @@ class _PaymentPageState extends State<PaymentPage> {
               child: CircularProgressIndicator(color: Color(0xFFD4B07E)),
             )
           : projects.isEmpty
-          ? const Center(child: Text("Data project tidak ditemukan."))
+          ? _buildEmptyState()
           : RefreshIndicator(
-              // Ditambah agar bisa tarik bawah untuk refresh
               onRefresh: _fetchProjects,
               child: ListView.builder(
                 padding: const EdgeInsets.all(20),
@@ -82,7 +89,6 @@ class _PaymentPageState extends State<PaymentPage> {
 
                   return GestureDetector(
                     onTap: () {
-                      // 2. BAGIAN INI SUDAH DIPERBAIKI UNTUK NAVIGASI
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -90,8 +96,10 @@ class _PaymentPageState extends State<PaymentPage> {
                               DetailPaymentPage(project: project),
                         ),
                       ).then((value) {
-                        // Jika kembali dari detail dan ada perubahan, refresh data
-                        if (value == true) _fetchProjects();
+                        // Jika kembali dari detail membawa nilai 'true', kita refresh list
+                        if (value == true) {
+                          _fetchProjects();
+                        }
                       });
                     },
                     child: Container(
@@ -118,15 +126,17 @@ class _PaymentPageState extends State<PaymentPage> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                project['nama_project']
-                                        ?.toString()
-                                        .toUpperCase() ??
-                                    "NAMA-PROJECT",
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 1.2,
+                              Expanded(
+                                child: Text(
+                                  project['nama_project']
+                                          ?.toString()
+                                          .toUpperCase() ??
+                                      "NAMA-PROJECT",
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1.2,
+                                  ),
                                 ),
                               ),
                               const Icon(
@@ -152,6 +162,33 @@ class _PaymentPageState extends State<PaymentPage> {
                 },
               ),
             ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(
+            Icons.account_balance_wallet_outlined,
+            size: 60,
+            color: Colors.grey,
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            "Semua tagihan aktif sudah selesai.",
+            style: TextStyle(color: Colors.grey, fontSize: 16),
+          ),
+          TextButton(
+            onPressed: _fetchProjects,
+            child: const Text(
+              "Refresh",
+              style: TextStyle(color: Color(0xFFD4B07E)),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

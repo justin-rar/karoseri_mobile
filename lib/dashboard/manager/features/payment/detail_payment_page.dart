@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:intl/intl.dart'; // Wajib untuk format angka 20.000
+import 'package:intl/intl.dart';
 
 class DetailPaymentPage extends StatefulWidget {
   final Map<String, dynamic> project;
@@ -14,7 +14,6 @@ class _DetailPaymentPageState extends State<DetailPaymentPage> {
   final supabase = Supabase.instance.client;
   final profitController = TextEditingController();
 
-  // Helper: Format angka ke Rupiah dengan titik (Contoh: 20.000)
   String formatIDR(dynamic nominal) {
     return NumberFormat.currency(
       locale: 'id',
@@ -32,11 +31,9 @@ class _DetailPaymentPageState extends State<DetailPaymentPage> {
   @override
   void initState() {
     super.initState();
-    // Mengambil data barang dari kolom 'items' di database
     items = widget.project['items'] ?? [];
     _calculateSubtotal();
 
-    // Inisialisasi profit jika sudah ada di database sebelumnya
     if (widget.project['profit_percentage'] != null) {
       profitPercent =
           double.tryParse(widget.project['profit_percentage'].toString()) ?? 0;
@@ -65,7 +62,8 @@ class _DetailPaymentPageState extends State<DetailPaymentPage> {
     });
   }
 
-  Future<void> _simpanTagihan() async {
+  // --- FUNGSI UTAMA: KONFIRMASI PEMBAYARAN & SELESAI ---
+  Future<void> _konfirmasiDanSelesaikan() async {
     setState(() => isLoading = true);
     try {
       await supabase
@@ -73,25 +71,28 @@ class _DetailPaymentPageState extends State<DetailPaymentPage> {
           .update({
             'profit_percentage': profitPercent,
             'total_tagihan': totalTagihan,
-            'status_bayar': 'Menunggu Pembayaran',
+            'status_bayar': 'Lunas', // Status berubah jadi Lunas
+            'is_completed': true, // Project pindah ke menu 'Project Selesai'
           })
           .eq('id_project', widget.project['id_project']);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text("Tagihan Berhasil Dikonfirmasi! ✅"),
+            content: Text("Pembayaran Lunas & Project Telah Selesai! ✅"),
             backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
           ),
         );
-        Navigator.pop(context, true); // Kembali dan refresh list
+        // Kembali ke halaman sebelumnya dengan nilai true agar list di-refresh
+        Navigator.pop(context, true);
       }
     } catch (e) {
       debugPrint("Error Update: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Gagal simpan: $e"),
+            content: Text("Gagal konfirmasi: $e"),
             backgroundColor: Colors.red,
           ),
         );
@@ -107,12 +108,11 @@ class _DetailPaymentPageState extends State<DetailPaymentPage> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text(
-          "Lihat Tagihan",
+          "Konfirmasi Pembayaran",
           style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.white,
         elevation: 0,
-        centerTitle: false,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
           onPressed: () => Navigator.pop(context),
@@ -122,7 +122,7 @@ class _DetailPaymentPageState extends State<DetailPaymentPage> {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            // BAGIAN ATAS: INFO PROYEK & CUSTOMER (KREM)
+            // INFO PROYEK (KREM)
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(18),
@@ -144,38 +144,23 @@ class _DetailPaymentPageState extends State<DetailPaymentPage> {
                       fontSize: 18,
                     ),
                   ),
-                  const Divider(color: Colors.black26, thickness: 1),
-                  const SizedBox(height: 5),
-
-                  // Menampilkan Nama Pemesan (Tata dll)
+                  const Divider(color: Colors.black26),
                   _buildCustomerInfo(
                     Icons.person,
                     "Pemesan",
                     widget.project['nama_pemesan'],
                   ),
                   const SizedBox(height: 8),
-
-                  // Menampilkan Nomor Telepon
                   _buildCustomerInfo(
                     Icons.phone,
                     "Telepon",
                     widget.project['no_hp'],
                   ),
-
-                  const SizedBox(height: 12),
-                  Text(
-                    widget.project['deskripsi'] ?? "Tanpa deskripsi proyek.",
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.black87,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
                 ],
               ),
             ),
 
-            // BAGIAN BAWAH: RINCIAN BIAYA (ABU-ABU)
+            // RINCIAN BIAYA (ABU-ABU)
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(18),
@@ -188,7 +173,6 @@ class _DetailPaymentPageState extends State<DetailPaymentPage> {
               ),
               child: Column(
                 children: [
-                  // Tabel Header
                   const Row(
                     children: [
                       Expanded(
@@ -217,53 +201,39 @@ class _DetailPaymentPageState extends State<DetailPaymentPage> {
                     ],
                   ),
                   const Divider(color: Colors.black54),
-
-                  // List Barang dari Database
-                  items.isEmpty
-                      ? const Padding(
-                          padding: EdgeInsets.all(15),
-                          child: Text("Belum ada data barang"),
-                        )
-                      : Column(
-                          children: items.map((item) {
-                            double harga =
-                                double.tryParse(item['harga'].toString()) ?? 0;
-                            int qty = int.tryParse(item['qty'].toString()) ?? 0;
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 6),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    flex: 3,
-                                    child: Text(item['nama_barang'] ?? "-"),
-                                  ),
-                                  Expanded(
-                                    flex: 1,
-                                    child: Text(
-                                      qty.toString(),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ),
-                                  Expanded(
-                                    flex: 2,
-                                    child: Text(
-                                      formatIDR(harga * qty),
-                                      textAlign: TextAlign.right,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }).toList(),
-                        ),
-
+                  ...items.map((item) {
+                    double harga =
+                        double.tryParse(item['harga'].toString()) ?? 0;
+                    int qty = int.tryParse(item['qty'].toString()) ?? 0;
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: Text(item['nama_barang'] ?? "-"),
+                          ),
+                          Expanded(
+                            flex: 1,
+                            child: Text(
+                              qty.toString(),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              formatIDR(harga * qty),
+                              textAlign: TextAlign.right,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
                   const Divider(color: Colors.black54),
-                  const SizedBox(height: 10),
-
-                  // Kalkulasi
                   _buildRowBiaya("Subtotal Pokok", formatIDR(subtotal)),
                   const SizedBox(height: 12),
-
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -279,15 +249,8 @@ class _DetailPaymentPageState extends State<DetailPaymentPage> {
                               controller: profitController,
                               keyboardType: TextInputType.number,
                               textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
                               decoration: const InputDecoration(
                                 isDense: true,
-                                contentPadding: EdgeInsets.symmetric(
-                                  vertical: 8,
-                                  horizontal: 5,
-                                ),
                                 border: OutlineInputBorder(),
                                 fillColor: Colors.white,
                                 filled: true,
@@ -309,8 +272,6 @@ class _DetailPaymentPageState extends State<DetailPaymentPage> {
                     ],
                   ),
                   const SizedBox(height: 20),
-
-                  // TOTAL AKHIR
                   Container(
                     padding: const EdgeInsets.all(15),
                     decoration: BoxDecoration(
@@ -339,41 +300,24 @@ class _DetailPaymentPageState extends State<DetailPaymentPage> {
                       ],
                     ),
                   ),
-
                   const SizedBox(height: 30),
-
-                  // TOMBOL KONFIRMASI
-                  Align(
-                    alignment: Alignment.centerRight,
+                  SizedBox(
+                    width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: isLoading ? null : _simpanTagihan,
+                      onPressed: isLoading ? null : _konfirmasiDanSelesaikan,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF00FF00),
                         foregroundColor: Colors.black,
-                        elevation: 3,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 40,
-                          vertical: 12,
-                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 15),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
                       child: isLoading
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.black,
-                              ),
-                            )
+                          ? const CircularProgressIndicator(color: Colors.black)
                           : const Text(
-                              "KONFIRMASI",
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1.1,
-                              ),
+                              "KONFIRMASI & SELESAI",
+                              style: TextStyle(fontWeight: FontWeight.bold),
                             ),
                     ),
                   ),
@@ -386,7 +330,6 @@ class _DetailPaymentPageState extends State<DetailPaymentPage> {
     );
   }
 
-  // Widget Helper untuk Baris Info Customer
   Widget _buildCustomerInfo(IconData icon, String label, dynamic value) {
     return Row(
       children: [
@@ -404,7 +347,6 @@ class _DetailPaymentPageState extends State<DetailPaymentPage> {
     );
   }
 
-  // Widget Helper untuk Baris Biaya
   Widget _buildRowBiaya(String label, String value) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
