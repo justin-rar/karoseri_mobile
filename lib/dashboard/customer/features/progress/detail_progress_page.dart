@@ -7,185 +7,132 @@ class DetailProgressPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Ambil persentase progress
-    double progressVal =
-        double.tryParse(project['progress']?.toString() ?? '0') ?? 0;
+    // Logika Status Berdasarkan Database
+    bool isLunas = project['status_bayar'] == 'Lunas';
+    // Mengambil rentang tanggal: Tanggal Buat s/d Tanggal Jadi
+    String rentangWaktu =
+        "${_formatDate(project['tgl_buat'])} - ${_formatDate(project['tgl_jadi'])}";
 
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          onPressed: () => Navigator.pop(context),
+        ),
         title: const Text(
-          "Detail Progress",
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          "Lihat Progress",
+          style: TextStyle(color: Colors.black),
         ),
         backgroundColor: Colors.white,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(25),
+        padding: const EdgeInsets.all(20),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- NAMA & STATUS PROYEK ---
-            Text(
-              project['nama_project']?.toString().toUpperCase() ??
-                  "DETAIL PROYEK",
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color(0xFFD4B07E).withOpacity(0.2),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                project['status_pengerjaan'] ?? "Dalam Pengerjaan",
-                style: const TextStyle(
-                  color: Color(0xFF8D6E63),
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-            const SizedBox(height: 30),
-
-            // --- VISUAL PROGRESS CIRCLE ---
-            Center(
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  SizedBox(
-                    width: 150,
-                    height: 150,
-                    child: CircularProgressIndicator(
-                      value: progressVal / 100,
-                      strokeWidth: 12,
-                      backgroundColor: Colors.black12,
-                      valueColor: const AlwaysStoppedAnimation<Color>(
-                        Color(0xFFD4B07E),
-                      ),
-                    ),
-                  ),
-                  Column(
-                    children: [
-                      Text(
-                        "${progressVal.toInt()}%",
-                        style: const TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const Text(
-                        "Selesai",
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 40),
-
-            // --- RINCIAN INFORMASI ---
-            _buildSectionTitle("Informasi Pengerjaan"),
-            const SizedBox(height: 15),
-            _buildDetailTile(
-              Icons.calendar_month,
-              "Tanggal Mulai",
-              _formatDate(project['created_at']),
-            ),
-            _buildDetailTile(
-              Icons.notes,
-              "Keterangan Update",
-              project['deskripsi'] ?? "Belum ada catatan update terbaru.",
-            ),
-
-            const SizedBox(height: 30),
-
-            // --- ESTIMASI ---
+            // --- KARTU HEADER (COKELAT) ---
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: const Color(0xFFF9F9F9),
-                borderRadius: BorderRadius.circular(15),
-                border: Border.all(color: Colors.black12),
+                color: const Color(0xFFD4B07E), // Warna cokelat sesuai gambar
+                borderRadius: BorderRadius.circular(12),
               ),
-              child: const Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.info_outline, color: Color(0xFFD4B07E)),
-                  SizedBox(width: 15),
-                  Expanded(
-                    child: Text(
-                      "Tim kami sedang bekerja maksimal untuk menyelesaikan proyek Anda tepat waktu.",
-                      style: TextStyle(fontSize: 13, color: Colors.black54),
+                  Padding(
+                    padding: const EdgeInsets.all(15),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "Estimasi Selesai $rentangWaktu",
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          isLunas
+                              ? "Pesanan Selesai"
+                              : "Pesanan sedang dikerjakan",
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // DETAIL PESANAN (ABU-ABU)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(15),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFE0E0E0), // Warna abu-abu bawah
+                      borderRadius: BorderRadius.only(
+                        bottomLeft: Radius.circular(12),
+                        bottomRight: Radius.circular(12),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "Detail Pesanan",
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          "Status: ${project['status_pengerjaan']}\n"
+                          "Deskripsi: ${project['deskripsi'] ?? '-'}",
+                          style: const TextStyle(fontSize: 13, height: 1.5),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
+
+            const SizedBox(height: 20),
+
+            // --- FOTO PROGRES 1 ---
+            _buildImageCard(project['foto_progres_1']),
+            const SizedBox(height: 15),
+
+            // --- FOTO PROGRES 2 ---
+            _buildImageCard(project['foto_progres_2']),
           ],
         ),
       ),
     );
   }
 
-  // Helper untuk format tanggal
+  Widget _buildImageCard(String? imageUrl) {
+    return Container(
+      width: double.infinity,
+      height: 250,
+      decoration: BoxDecoration(
+        color: const Color(0xFFD4B07E).withOpacity(0.5),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: imageUrl != null && imageUrl.startsWith('http')
+          ? ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.network(imageUrl, fit: BoxFit.cover),
+            )
+          : const Center(
+              child: Icon(Icons.image, size: 50, color: Colors.white),
+            ),
+    );
+  }
+
   String _formatDate(String? dateStr) {
-    if (dateStr == null) return "-";
+    if (dateStr == null || dateStr.isEmpty) return "?";
     try {
       DateTime dt = DateTime.parse(dateStr);
-      return DateFormat('dd MMMM yyyy').format(dt);
+      return DateFormat('dd MMM', 'id_ID').format(dt);
     } catch (e) {
       return dateStr;
     }
-  }
-
-  Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: const TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.bold,
-        color: Colors.black87,
-      ),
-    );
-  }
-
-  Widget _buildDetailTile(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 20, color: Colors.grey),
-          const SizedBox(width: 15),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }

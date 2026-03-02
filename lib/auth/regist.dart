@@ -11,9 +11,9 @@ class RegisterPage extends StatefulWidget {
 class _RegisterPageState extends State<RegisterPage> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
-  final confirmPasswordController =
-      TextEditingController(); // Tambahan konfirmasi
+  final confirmPasswordController = TextEditingController();
   final namaController = TextEditingController();
+  final noHpController = TextEditingController();
 
   bool isLoading = false;
 
@@ -21,6 +21,7 @@ class _RegisterPageState extends State<RegisterPage> {
     // 1. Validasi Kolom Kosong
     if (namaController.text.isEmpty ||
         emailController.text.isEmpty ||
+        noHpController.text.isEmpty ||
         passwordController.text.isEmpty ||
         confirmPasswordController.text.isEmpty) {
       ScaffoldMessenger.of(
@@ -40,33 +41,33 @@ class _RegisterPageState extends State<RegisterPage> {
       return;
     }
 
-    // 3. Validasi Panjang Password (minimal 6 karakter untuk Supabase)
-    if (passwordController.text.length < 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Password minimal 6 karakter!")),
-      );
-      return;
-    }
-
     setState(() => isLoading = true);
 
     try {
+      final supabase = Supabase.instance.client;
+
       // 1. Daftar ke Supabase Auth
-      final response = await Supabase.instance.client.auth.signUp(
+      // Role diset otomatis di 'data' (User Metadata)
+      final response = await supabase.auth.signUp(
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
+        data: {
+          'nama': namaController.text.trim(),
+          'no_hp': noHpController.text.trim(),
+          'role': 'Customer', // <--- OTOMATIS CUSTOMER
+        },
       );
 
       final user = response.user;
 
       if (user != null) {
-        // 2. Simpan data ke tabel 'Users'
-        // Role langsung dipasang 'Customer' tanpa perlu milih lagi
-        await Supabase.instance.client.from('Users').insert({
+        // 2. Simpan data ke tabel 'Users' di Database
+        await supabase.from('Users').insert({
           'id_user': user.id,
           'email': emailController.text.trim(),
-          'role': 'Customer', // <--- OTOMATIS JADI CUSTOMER
           'nama': namaController.text.trim(),
+          'no_hp': noHpController.text.trim(),
+          'role': 'Customer', // <--- OTOMATIS CUSTOMER
         });
 
         if (mounted) {
@@ -111,61 +112,43 @@ class _RegisterPageState extends State<RegisterPage> {
         child: Column(
           children: [
             const Icon(Icons.person_add, size: 80, color: Color(0xFFD4B07E)),
-            const SizedBox(height: 10),
-            const Text(
-              "Silahkan membuat akun",
-              style: TextStyle(color: Colors.grey, fontSize: 14),
+            const SizedBox(height: 30),
+
+            _buildTextField(namaController, "Nama Lengkap", Icons.person),
+            const SizedBox(height: 15),
+
+            _buildTextField(
+              noHpController,
+              "Nomor WhatsApp/HP",
+              Icons.phone_android,
+              type: TextInputType.phone,
+            ),
+            const SizedBox(height: 15),
+
+            _buildTextField(
+              emailController,
+              "Email",
+              Icons.email,
+              type: TextInputType.emailAddress,
+            ),
+            const SizedBox(height: 15),
+
+            _buildTextField(
+              passwordController,
+              "Password",
+              Icons.lock,
+              obscure: true,
+            ),
+            const SizedBox(height: 15),
+
+            _buildTextField(
+              confirmPasswordController,
+              "Konfirmasi Password",
+              Icons.lock_reset,
+              obscure: true,
             ),
             const SizedBox(height: 30),
 
-            // INPUT NAMA
-            TextField(
-              controller: namaController,
-              decoration: const InputDecoration(
-                labelText: "Nama Lengkap",
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.person),
-              ),
-            ),
-            const SizedBox(height: 15),
-
-            // INPUT EMAIL
-            TextField(
-              controller: emailController,
-              decoration: const InputDecoration(
-                labelText: "Email",
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.email),
-              ),
-            ),
-            const SizedBox(height: 15),
-
-            // INPUT PASSWORD
-            TextField(
-              controller: passwordController,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: "Password",
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.lock),
-              ),
-            ),
-            const SizedBox(height: 15),
-
-            // INPUT KONFIRMASI PASSWORD
-            TextField(
-              controller: confirmPasswordController,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: "Konfirmasi Password",
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.lock_reset),
-              ),
-            ),
-
-            const SizedBox(height: 30),
-
-            // TOMBOL DAFTAR
             SizedBox(
               width: double.infinity,
               height: 50,
@@ -178,7 +161,14 @@ class _RegisterPageState extends State<RegisterPage> {
                   ),
                 ),
                 child: isLoading
-                    ? const CircularProgressIndicator(color: Colors.white)
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
                     : const Text(
                         "DAFTAR SEKARANG",
                         style: TextStyle(
@@ -190,6 +180,25 @@ class _RegisterPageState extends State<RegisterPage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildTextField(
+    TextEditingController controller,
+    String label,
+    IconData icon, {
+    bool obscure = false,
+    TextInputType type = TextInputType.text,
+  }) {
+    return TextField(
+      controller: controller,
+      obscureText: obscure,
+      keyboardType: type,
+      decoration: InputDecoration(
+        labelText: label,
+        border: const OutlineInputBorder(),
+        prefixIcon: Icon(icon),
       ),
     );
   }

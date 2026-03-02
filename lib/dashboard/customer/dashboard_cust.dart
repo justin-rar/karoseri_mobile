@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-// Import sesuai struktur folder di gambar
+// Import sesuai struktur folder
 import 'features/progress/progress_page.dart';
+import 'features/invoice/invoice_page.dart'; // Navigasi ke invoice aktif
 
 class DashboardCust extends StatefulWidget {
   const DashboardCust({super.key});
@@ -12,7 +13,7 @@ class DashboardCust extends StatefulWidget {
 
 class _DashboardCustState extends State<DashboardCust> {
   final supabase = Supabase.instance.client;
-  String userName = "User";
+  String userName = "user";
 
   @override
   void initState() {
@@ -29,7 +30,7 @@ class _DashboardCustState extends State<DashboardCust> {
             user.userMetadata?['nama'] ??
             user.userMetadata?['full_name'] ??
             user.email?.split('@')[0] ??
-            "Pelanggan";
+            "pelanggan";
       });
     }
   }
@@ -46,7 +47,7 @@ class _DashboardCustState extends State<DashboardCust> {
             children: [
               // --- WELCOME HEADER ---
               Text(
-                "HELLO, ${(userName ?? "user").toLowerCase()}",
+                "HELLO, ${userName.toLowerCase()}",
                 style: const TextStyle(
                   fontSize: 40,
                   fontWeight: FontWeight.bold,
@@ -66,6 +67,7 @@ class _DashboardCustState extends State<DashboardCust> {
 
               // --- MENU GRID ---
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Menu Lihat Progress
                   Expanded(
@@ -87,7 +89,12 @@ class _DashboardCustState extends State<DashboardCust> {
                     child: _buildMenuCard(
                       title: "Lihat Invoice Tagihan",
                       onTap: () {
-                        // Tambahkan navigasi ke invoice_page.dart jika sudah dibuat
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const InvoicePage(),
+                          ),
+                        );
                       },
                     ),
                   ),
@@ -106,14 +113,11 @@ class _DashboardCustState extends State<DashboardCust> {
         GestureDetector(
           onTap: onTap,
           child: Container(
-            height: 280, // Tinggi disesuaikan dengan desain panjang di gambar
+            height: 280,
             decoration: BoxDecoration(
-              color: const Color(
-                0xFFD4B07E,
-              ), // Warna cokelat keemasan sesuai desain
+              color: const Color(0xFFD4B07E),
               borderRadius: BorderRadius.circular(4),
             ),
-            // Cross lines placeholder sesuai desain wireframe
             child: Stack(
               children: [
                 Center(
@@ -141,7 +145,6 @@ class _DashboardCustState extends State<DashboardCust> {
   }
 }
 
-// Painter untuk menggambar tanda silang (X) di dalam kotak menu
 class CrossPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
