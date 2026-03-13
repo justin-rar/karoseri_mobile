@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 // Import sesuai struktur folder
 import 'features/progress/progress_page.dart';
-import 'features/invoice/invoice_page.dart'; // Navigasi ke invoice aktif
+import 'features/invoice/invoice_page.dart';
 
 class DashboardCust extends StatefulWidget {
   const DashboardCust({super.key});
@@ -25,13 +25,22 @@ class _DashboardCustState extends State<DashboardCust> {
     final user = supabase.auth.currentUser;
     if (user != null) {
       setState(() {
-        // Mengambil nama dari metadata atau fallback ke email
         userName =
             user.userMetadata?['nama'] ??
             user.userMetadata?['full_name'] ??
             user.email?.split('@')[0] ??
             "pelanggan";
       });
+    }
+  }
+
+  // FUNGSI LOGOUT GACOR
+  Future<void> _handleLogout() async {
+    await supabase.auth.signOut();
+    if (mounted) {
+      // Menghapus semua history page dan balik ke Login
+      // Pastikan nama class Login kamu sesuai, di sini saya asumsikan 'LoginPage'
+      Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
     }
   }
 
@@ -69,7 +78,6 @@ class _DashboardCustState extends State<DashboardCust> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Menu Lihat Progress
                   Expanded(
                     child: _buildMenuCard(
                       title: "Lihat Progress",
@@ -84,7 +92,6 @@ class _DashboardCustState extends State<DashboardCust> {
                     ),
                   ),
                   const SizedBox(width: 25),
-                  // Menu Lihat Invoice
                   Expanded(
                     child: _buildMenuCard(
                       title: "Lihat Invoice Tagihan",
@@ -100,9 +107,57 @@ class _DashboardCustState extends State<DashboardCust> {
                   ),
                 ],
               ),
+
+              const SizedBox(height: 80), // Jarak ke tombol logout
+              // --- TOMBOL LOGOUT ---
+              Center(
+                child: TextButton.icon(
+                  onPressed: () {
+                    // Munculkan konfirmasi sebelum logout
+                    _showLogoutDialog();
+                  },
+                  icon: const Icon(Icons.logout, color: Colors.redAccent),
+                  label: const Text(
+                    "LOG OUT ACCOUNT",
+                    style: TextStyle(
+                      color: Colors.redAccent,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  // Dialog Konfirmasi Logout
+  void _showLogoutDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Keluar Akun?"),
+        content: const Text("Apakah Anda yakin ingin keluar dari aplikasi?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Batal", style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _handleLogout();
+            },
+            child: const Text(
+              "Ya, Keluar",
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -136,7 +191,7 @@ class _DashboardCustState extends State<DashboardCust> {
           textAlign: TextAlign.center,
           style: const TextStyle(
             fontSize: 16,
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.bold,
             color: Colors.black,
           ),
         ),

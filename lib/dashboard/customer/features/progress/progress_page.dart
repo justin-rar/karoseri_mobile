@@ -20,29 +20,34 @@ class _ProgressPageState extends State<ProgressPage> {
     _fetchMyProjects();
   }
 
+  // Fungsi fetch data yang akan dipanggil saat inisialisasi & refresh manual
   Future<void> _fetchMyProjects() async {
     try {
+      if (!mounted) return;
       setState(() => isLoading = true);
+
       final user = supabase.auth.currentUser;
+      if (user == null) {
+        setState(() => isLoading = false);
+        return;
+      }
 
-      if (user == null) return;
-
-      // Filter berdasarkan nomor HP atau Email yang terdaftar di tabel projects
-      // Sesuaikan dengan kolom identitas yang kamu gunakan di database
       final data = await supabase
           .from('projects')
           .select()
           .eq('no_hp', user.userMetadata?['no_hp'] ?? '')
-          .eq('is_completed', false) // Hanya proyek yang masih berjalan
+          .eq('is_completed', false)
           .order('created_at', ascending: false);
 
-      setState(() {
-        myProjects = List<Map<String, dynamic>>.from(data);
-        isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          myProjects = List<Map<String, dynamic>>.from(data);
+          isLoading = false;
+        });
+      }
     } catch (e) {
-      debugPrint("Error fetching customer projects: $e");
-      setState(() => isLoading = false);
+      debugPrint("Error fetching data: $e");
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
@@ -62,32 +67,32 @@ class _ProgressPageState extends State<ProgressPage> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFFD4B07E)),
-            )
-          : myProjects.isEmpty
-          ? _buildEmptyState()
-          : RefreshIndicator(
-              onRefresh: _fetchMyProjects,
-              child: ListView.builder(
+      // REFRESH INDICATOR: Agar bisa ditarik ke bawah (Force Refresh)
+      body: RefreshIndicator(
+        onRefresh: _fetchMyProjects, // Panggil fungsi fetch data lagi
+        color: const Color(0xFFD4B07E),
+        child: isLoading
+            ? const Center(
+                child: CircularProgressIndicator(color: Color(0xFFD4B07E)),
+              )
+            : myProjects.isEmpty
+            ? _buildEmptyState()
+            : ListView.builder(
+                // Memastikan list bisa ditarik meski isinya sedikit
+                physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.all(20),
                 itemCount: myProjects.length,
                 itemBuilder: (context, index) {
                   final project = myProjects[index];
-                  // Logika persentase progress (jika ada kolom progress di DB)
-                  double progressVal =
-                      double.tryParse(project['progress']?.toString() ?? '0') ??
-                      0;
 
                   return GestureDetector(
                     onTap: () {
-                      final dataProyek = project[index];
+                      String hp = project['no_hp']?.toString() ?? '';
                       Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (context) =>
-                              DetailProgressPage(project: dataProyek),
+                              DetailProgressPage(noHpCustomer: hp),
                         ),
                       );
                     },
@@ -122,35 +127,23 @@ class _ProgressPageState extends State<ProgressPage> {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 15),
+                          const SizedBox(height: 10),
                           Text(
                             "Status: ${project['status_pengerjaan'] ?? 'Dalam Antrean'}",
                             style: const TextStyle(
-                              fontSize: 13,
+                              fontSize: 14,
                               color: Colors.blueGrey,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
-                          const SizedBox(height: 10),
-                          // Progress Bar Visual
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: LinearProgressIndicator(
-                              value: progressVal / 100,
-                              minHeight: 8,
-                              backgroundColor: Colors.black12,
-                              valueColor: const AlwaysStoppedAnimation<Color>(
-                                Color(0xFFD4B07E),
-                              ),
-                            ),
-                          ),
+                          // PERSEN SUDAH DIHAPUS TOTAL DI SINI
                           const SizedBox(height: 5),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: Text(
-                              "${progressVal.toInt()}%",
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
+                          const Text(
+                            "Ketuk untuk melihat detail tahapan",
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey,
+                              fontStyle: FontStyle.italic,
                             ),
                           ),
                         ],
@@ -159,24 +152,22 @@ class _ProgressPageState extends State<ProgressPage> {
                   );
                 },
               ),
-            ),
+      ),
     );
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.assignment_late_outlined,
-            size: 80,
-            color: Colors.grey[300],
-          ),
-          const SizedBox(height: 15),
-          const Text("Belum ada proyek yang sedang berjalan."),
-        ],
-      ),
+    return ListView(
+      // Pakai ListView agar RefreshIndicator bisa jalan di layar kosong
+      children: [
+        SizedBox(height: MediaQuery.of(context).size.height * 0.3),
+        const Icon(
+          Icons.assignment_late_outlined,
+          size: 80,
+          color: Colors.grey,
+        ),
+        const Center(child: Text("Belum ada proyek yang sedang berjalan.")),
+      ],
     );
   }
 }
