@@ -27,6 +27,7 @@ class _DetailPaymentPageState extends State<DetailPaymentPage> {
   double profitPercent = 0;
   double totalTagihan = 0;
   bool isLoading = false;
+  bool isTagihanUpdating = false; // Loading khusus tombol update tagihan
 
   @override
   void initState() {
@@ -62,7 +63,35 @@ class _DetailPaymentPageState extends State<DetailPaymentPage> {
     });
   }
 
-  // --- FUNGSI UTAMA: KONFIRMASI PEMBAYARAN & SELESAI ---
+  // --- FUNGSI 1: HANYA UPDATE TAGIHAN (Agar muncul di HP Customer) ---
+  Future<void> _updateTagihanKeDatabase() async {
+    setState(() => isTagihanUpdating = true);
+    try {
+      await supabase
+          .from('projects')
+          .update({
+            'profit_percentage': profitPercent,
+            'total_tagihan': totalTagihan,
+          })
+          .eq('id_project', widget.project['id_project']);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Total tagihan berhasil dikirim ke Customer! 📩"),
+            backgroundColor: Colors.blue,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint("Error Update Tagihan: $e");
+    } finally {
+      if (mounted) setState(() => isTagihanUpdating = false);
+    }
+  }
+
+  // --- FUNGSI 2: KONFIRMASI PEMBAYARAN & SELESAI (Final Step) ---
   Future<void> _konfirmasiDanSelesaikan() async {
     setState(() => isLoading = true);
     try {
@@ -71,8 +100,8 @@ class _DetailPaymentPageState extends State<DetailPaymentPage> {
           .update({
             'profit_percentage': profitPercent,
             'total_tagihan': totalTagihan,
-            'status_bayar': 'Lunas', // Status berubah jadi Lunas
-            'is_completed': true, // Project pindah ke menu 'Project Selesai'
+            'status_bayar': 'Lunas',
+            'is_completed': true,
           })
           .eq('id_project', widget.project['id_project']);
 
@@ -84,11 +113,10 @@ class _DetailPaymentPageState extends State<DetailPaymentPage> {
             behavior: SnackBarBehavior.floating,
           ),
         );
-        // Kembali ke halaman sebelumnya dengan nilai true agar list di-refresh
         Navigator.pop(context, true);
       }
     } catch (e) {
-      debugPrint("Error Update: $e");
+      debugPrint("Error Final Update: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -108,7 +136,7 @@ class _DetailPaymentPageState extends State<DetailPaymentPage> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text(
-          "Konfirmasi Pembayaran",
+          "Detail Pembayaran",
           style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.white,
@@ -234,6 +262,8 @@ class _DetailPaymentPageState extends State<DetailPaymentPage> {
                   const Divider(color: Colors.black54),
                   _buildRowBiaya("Subtotal Pokok", formatIDR(subtotal)),
                   const SizedBox(height: 12),
+
+                  // INPUT MARGIN
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -272,6 +302,8 @@ class _DetailPaymentPageState extends State<DetailPaymentPage> {
                     ],
                   ),
                   const SizedBox(height: 20),
+
+                  // TOTAL BOX
                   Container(
                     padding: const EdgeInsets.all(15),
                     decoration: BoxDecoration(
@@ -301,6 +333,41 @@ class _DetailPaymentPageState extends State<DetailPaymentPage> {
                     ),
                   ),
                   const SizedBox(height: 30),
+
+                  // TOMBOL 1: UPDATE TAGIHAN (KIRIM KE CUSTOMER)
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: isTagihanUpdating
+                          ? null
+                          : _updateTagihanKeDatabase,
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        side: const BorderSide(color: Colors.blue, width: 2),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      icon: isTagihanUpdating
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.send_rounded, color: Colors.blue),
+                      label: const Text(
+                        "KONFIRMASI TOTAL TAGIHAN",
+                        style: TextStyle(
+                          color: Colors.blue,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // TOMBOL 2: KONFIRMASI & SELESAI
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
@@ -316,9 +383,18 @@ class _DetailPaymentPageState extends State<DetailPaymentPage> {
                       child: isLoading
                           ? const CircularProgressIndicator(color: Colors.black)
                           : const Text(
-                              "KONFIRMASI & SELESAI",
+                              "KONFIRMASI PEMBAYARAN LUNAS",
                               style: TextStyle(fontWeight: FontWeight.bold),
                             ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    "*Klik tombol hijau hanya jika customer sudah membayar.",
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.black54,
+                      fontStyle: FontStyle.italic,
                     ),
                   ),
                 ],
