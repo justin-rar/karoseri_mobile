@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:karoseri_mobile/auth/login.dart'; // Import halaman login kamu
 
-// Import halaman tujuan
+// Import halaman tujuan sesuai struktur folder
 import 'features/project/add_project_page.dart';
 import 'features/inventory/inventory_page.dart';
 import 'features/progress/update_progress_page.dart';
@@ -16,6 +17,7 @@ class DashboardPage extends StatefulWidget {
 }
 
 class _DashboardPageState extends State<DashboardPage> {
+  final supabase = Supabase.instance.client;
   String userName = "Admin";
 
   @override
@@ -25,7 +27,7 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _getUserData() {
-    final user = Supabase.instance.client.auth.currentUser;
+    final user = supabase.auth.currentUser;
     if (user != null) {
       setState(() {
         userName =
@@ -36,13 +38,69 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
+  // --- FUNGSI LOGOUT MANAGER ---
+  Future<void> _handleLogout() async {
+    try {
+      await supabase.auth.signOut();
+      if (mounted) {
+        // Menghapus semua history page dan kembali ke Login
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const LoginPage()),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Gagal logout: $e")));
+      }
+    }
+  }
+
+  // --- DIALOG KONFIRMASI LOGOUT ---
+  void _showLogoutDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: const Text("Konfirmasi Logout"),
+        content: const Text(
+          "Apakah Anda yakin ingin keluar dari akun Manager?",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("BATAL", style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _handleLogout();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              "YA, KELUAR",
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
-          // Diaktifkan kembali karena menu bertambah
           physics: const BouncingScrollPhysics(),
           child: Padding(
             padding: const EdgeInsets.all(25.0),
@@ -75,8 +133,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
                 const SizedBox(height: 15),
 
-                // --- MENU SECTION (RESPONSIVE GRID) ---
-                // Baris 1
+                // --- MENU SECTION ---
                 Row(
                   children: [
                     Expanded(
@@ -100,7 +157,6 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
                 const SizedBox(height: 15),
 
-                // Baris 2
                 Row(
                   children: [
                     Expanded(
@@ -124,7 +180,6 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
                 const SizedBox(height: 15),
 
-                // Baris 3: Menu Project Selesai (Dibuat lebar/Full Width agar simetris)
                 _itemMenu(
                   context,
                   "Project Selesai",
@@ -135,19 +190,21 @@ class _DashboardPageState extends State<DashboardPage> {
 
                 const SizedBox(height: 40),
 
-                // Tombol Logout
+                // --- TOMBOL LOGOUT ---
                 Center(
                   child: TextButton.icon(
-                    onPressed: () async {
-                      await Supabase.instance.client.auth.signOut();
-                    },
+                    onPressed: _showLogoutDialog,
                     icon: const Icon(Icons.logout, color: Colors.red, size: 20),
                     label: const Text(
                       "Logout Akun",
-                      style: TextStyle(color: Colors.red),
+                      style: TextStyle(
+                        color: Colors.red,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
+                const SizedBox(height: 20),
               ],
             ),
           ),
@@ -170,7 +227,7 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
       borderRadius: BorderRadius.circular(20),
       child: Container(
-        height: isFullWidth ? 100 : 160, // Sesuaikan tinggi jika full width
+        height: isFullWidth ? 100 : 160,
         width: double.infinity,
         decoration: BoxDecoration(
           color: const Color(0xFFD4B07E),
@@ -198,7 +255,6 @@ class _DashboardPageState extends State<DashboardPage> {
               padding: const EdgeInsets.all(20.0),
               child: isFullWidth
                   ? Row(
-                      // Layout khusus jika menu lebar (Full Width)
                       children: [
                         Container(
                           padding: const EdgeInsets.all(12),
@@ -224,7 +280,6 @@ class _DashboardPageState extends State<DashboardPage> {
                       ],
                     )
                   : Column(
-                      // Layout standar kotak
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [

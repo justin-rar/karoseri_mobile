@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:intl/intl.dart';
+import 'detail_bayar_page.dart';
 
 class InvoicePage extends StatefulWidget {
   const InvoicePage({super.key});
@@ -24,10 +24,8 @@ class _InvoicePageState extends State<InvoicePage> {
     try {
       setState(() => isLoading = true);
       final user = supabase.auth.currentUser;
-
       if (user == null) return;
 
-      // Ambil data berdasarkan no_hp yang ada di metadata user
       final data = await supabase
           .from('projects')
           .select()
@@ -39,26 +37,20 @@ class _InvoicePageState extends State<InvoicePage> {
         isLoading = false;
       });
     } catch (e) {
-      debugPrint("Error fetching invoices: $e");
+      debugPrint("Error: $e");
       setState(() => isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final currencyFormatter = NumberFormat.currency(
-      locale: 'id_ID',
-      symbol: 'Rp',
-      decimalDigits: 0,
-    );
-
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
         title: const Text(
-          "Tagihan Saya",
+          "Pilih Proyek",
           style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
         leading: IconButton(
@@ -71,7 +63,7 @@ class _InvoicePageState extends State<InvoicePage> {
               child: CircularProgressIndicator(color: Color(0xFFD4B07E)),
             )
           : myInvoices.isEmpty
-          ? _buildEmptyState()
+          ? const Center(child: Text("Belum ada proyek terdaftar."))
           : RefreshIndicator(
               onRefresh: _fetchInvoices,
               child: ListView.builder(
@@ -79,129 +71,85 @@ class _InvoicePageState extends State<InvoicePage> {
                 itemCount: myInvoices.length,
                 itemBuilder: (context, index) {
                   final item = myInvoices[index];
-                  double total =
-                      double.tryParse(
-                        item['total_tagihan']?.toString() ?? '0',
-                      ) ??
-                      0;
+                  // Logika pengecekan status lunas
                   String status = item['status_bayar'] ?? "Belum Lunas";
+                  bool isLunas = status.toLowerCase() == 'lunas';
 
-                  // Format Tanggal yang aman
-                  String formattedDate = "-";
-                  if (item['created_at'] != null) {
-                    try {
-                      formattedDate = DateFormat(
-                        'dd MMM yyyy',
-                      ).format(DateTime.parse(item['created_at']));
-                    } catch (e) {
-                      formattedDate = item['created_at'].toString().substring(
-                        0,
-                        10,
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              DetailBayarPage(projectData: item),
+                        ),
                       );
-                    }
-                  }
-
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 15),
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.black12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.02),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  item['nama_project']
-                                          ?.toString()
-                                          .toUpperCase() ??
-                                      "PROJECT",
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  formattedDate,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 5,
-                              ),
-                              decoration: BoxDecoration(
-                                color: status.toLowerCase() == 'lunas'
-                                    ? Colors.green.withOpacity(0.1)
-                                    : Colors.orange.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(20),
-                              ), // <-- PERBAIKAN: Gunakan ) bukan ]
-                              child: Text(
-                                status.toUpperCase(),
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: status.toLowerCase() == 'lunas'
-                                      ? Colors.green
-                                      : Colors.orange,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 15),
-                          child: Divider(height: 1),
-                        ),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              "Total Tagihan",
-                              style: TextStyle(
-                                color: Colors.grey,
-                                fontSize: 13,
-                              ),
-                            ),
-                            Text(
-                              currencyFormatter.format(total),
+                    },
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 15),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 25,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.black12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.02),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              item['nama_project']?.toString().toUpperCase() ??
+                                  "PROJECT",
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
-                                color: Color(0xFFD4B07E),
+                                letterSpacing: 0.5,
                               ),
                             ),
-                          ],
-                        ),
-                      ],
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isLunas
+                                  ? Colors.green.withOpacity(0.1)
+                                  : Colors.orange.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              isLunas ? "LUNAS" : "BELUM LUNAS",
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: isLunas ? Colors.green : Colors.orange,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          const Icon(
+                            Icons.arrow_forward_ios,
+                            size: 14,
+                            color: Colors.black26,
+                          ),
+                        ],
+                      ),
                     ),
                   );
                 },
               ),
             ),
     );
-  }
-
-  Widget _buildEmptyState() {
-    return const Center(child: Text("Tidak ada riwayat tagihan."));
   }
 }

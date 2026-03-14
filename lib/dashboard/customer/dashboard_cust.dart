@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-// Import sesuai struktur folder
+import 'package:karoseri_mobile/auth/login.dart'; // Import LoginPage kamu
 import 'features/progress/progress_page.dart';
 import 'features/invoice/invoice_page.dart';
 
@@ -13,7 +13,7 @@ class DashboardCust extends StatefulWidget {
 
 class _DashboardCustState extends State<DashboardCust> {
   final supabase = Supabase.instance.client;
-  String userName = "user";
+  String userName = "pelanggan";
 
   @override
   void initState() {
@@ -25,6 +25,7 @@ class _DashboardCustState extends State<DashboardCust> {
     final user = supabase.auth.currentUser;
     if (user != null) {
       setState(() {
+        // Mengambil nama dari metadata atau email
         userName =
             user.userMetadata?['nama'] ??
             user.userMetadata?['full_name'] ??
@@ -34,14 +35,59 @@ class _DashboardCustState extends State<DashboardCust> {
     }
   }
 
-  // FUNGSI LOGOUT GACOR
+  // FUNGSI LOGOUT
   Future<void> _handleLogout() async {
-    await supabase.auth.signOut();
-    if (mounted) {
-      // Menghapus semua history page dan balik ke Login
-      // Pastikan nama class Login kamu sesuai, di sini saya asumsikan 'LoginPage'
-      Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+    try {
+      await supabase.auth.signOut();
+      if (mounted) {
+        // Navigasi balik ke LoginPage dan hapus semua history page
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const LoginPage()),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Error saat keluar: $e")));
+      }
     }
+  }
+
+  // Dialog Konfirmasi Logout
+  void _showLogoutDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: const Text("Keluar Akun?"),
+        content: const Text("Apakah Anda yakin ingin keluar dari aplikasi?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("BATAL", style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _handleLogout();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              "YA, KELUAR",
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -65,7 +111,7 @@ class _DashboardCustState extends State<DashboardCust> {
               ),
               const SizedBox(height: 20),
               const Text(
-                "Selamat datang di portal pelanggan kami. Di sini Anda dapat memantau perkembangan proyek Anda secara real-time dan mengelola tagihan dengan lebih mudah dan transparan.",
+                "Selamat datang di portal pelanggan kami. Di sini Anda dapat memantau perkembangan proyek Anda secara real-time dan mengelola tagihan dengan lebih mudah.",
                 style: TextStyle(
                   fontSize: 15,
                   color: Colors.black87,
@@ -108,14 +154,12 @@ class _DashboardCustState extends State<DashboardCust> {
                 ],
               ),
 
-              const SizedBox(height: 80), // Jarak ke tombol logout
+              const SizedBox(height: 80),
+
               // --- TOMBOL LOGOUT ---
               Center(
                 child: TextButton.icon(
-                  onPressed: () {
-                    // Munculkan konfirmasi sebelum logout
-                    _showLogoutDialog();
-                  },
+                  onPressed: _showLogoutDialog,
                   icon: const Icon(Icons.logout, color: Colors.redAccent),
                   label: const Text(
                     "LOG OUT ACCOUNT",
@@ -135,40 +179,13 @@ class _DashboardCustState extends State<DashboardCust> {
     );
   }
 
-  // Dialog Konfirmasi Logout
-  void _showLogoutDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Keluar Akun?"),
-        content: const Text("Apakah Anda yakin ingin keluar dari aplikasi?"),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Batal", style: TextStyle(color: Colors.grey)),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _handleLogout();
-            },
-            child: const Text(
-              "Ya, Keluar",
-              style: TextStyle(color: Colors.red),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildMenuCard({required String title, required VoidCallback onTap}) {
     return Column(
       children: [
         GestureDetector(
           onTap: onTap,
           child: Container(
-            height: 280,
+            height: 240, // Sedikit disesuaikan agar proporsional
             decoration: BoxDecoration(
               color: const Color(0xFFD4B07E),
               borderRadius: BorderRadius.circular(4),
@@ -190,7 +207,7 @@ class _DashboardCustState extends State<DashboardCust> {
           title,
           textAlign: TextAlign.center,
           style: const TextStyle(
-            fontSize: 16,
+            fontSize: 15,
             fontWeight: FontWeight.bold,
             color: Colors.black,
           ),
@@ -204,8 +221,8 @@ class CrossPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.black.withOpacity(0.3)
-      ..strokeWidth = 1.2;
+      ..color = Colors.black.withOpacity(0.2)
+      ..strokeWidth = 1.0;
     canvas.drawLine(Offset.zero, Offset(size.width, size.height), paint);
     canvas.drawLine(Offset(0, size.height), Offset(size.width, 0), paint);
   }
