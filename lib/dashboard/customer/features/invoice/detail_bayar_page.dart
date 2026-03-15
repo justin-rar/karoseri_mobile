@@ -14,7 +14,7 @@ class DetailBayarPage extends StatefulWidget {
 class _DetailBayarPageState extends State<DetailBayarPage> {
   final supabase = Supabase.instance.client;
 
-  // Formatter untuk Rupiah
+  // Formatter Mata Uang Rupiah
   final formatter = NumberFormat.currency(
     locale: 'id_ID',
     symbol: 'Rp ',
@@ -23,15 +23,17 @@ class _DetailBayarPageState extends State<DetailBayarPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Ambil ID Project dari data yang dikirim halaman sebelumnya
     final idProject = widget.projectData['id_project'];
 
-    // Ambil total tagihan yang sudah di-update Manager
+    // Ambil Total Tagihan (data dari tabel projects)
     double totalTagihan =
         double.tryParse(
           widget.projectData['total_tagihan']?.toString() ?? '0',
         ) ??
         0;
 
+    // Cek Status Pembayaran
     bool isLunas =
         widget.projectData['status_bayar']?.toString().toLowerCase() == 'lunas';
 
@@ -40,59 +42,74 @@ class _DetailBayarPageState extends State<DetailBayarPage> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
+        centerTitle: true,
         title: const Text(
-          "Rincian Tagihan",
+          "Detail Pembayaran",
           style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
         leading: const BackButton(color: Colors.black),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(25),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- HEADER INFO ---
-            Text(
-              widget.projectData['nama_project']?.toString().toUpperCase() ??
-                  "PROJECT",
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 5),
-            Row(
-              children: [
-                Icon(
-                  isLunas ? Icons.check_circle : Icons.pending_actions_rounded,
-                  size: 16,
-                  color: isLunas ? Colors.green : Colors.orange,
-                ),
-                const SizedBox(width: 5),
-                Text(
-                  "Status: ${isLunas ? 'LUNAS' : 'MENUNGGU PEMBAYARAN'}",
-                  style: TextStyle(
-                    color: isLunas ? Colors.green : Colors.orange,
-                    fontWeight: FontWeight.bold,
+            // --- BAGIAN HEADER ---
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFFD4B07E), // Warna coklat muda karoseri
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.projectData['nama_project']
+                            ?.toString()
+                            .toUpperCase() ??
+                        "PROJECT",
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
                   ),
-                ),
-              ],
+                  const Divider(color: Colors.white54),
+                  const SizedBox(height: 5),
+                  Text(
+                    "Pemesanan Atas Nama: ${widget.projectData['nama_pemesan'] ?? '-'}",
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    "Status: ${isLunas ? 'LUNAS' : 'BELUM LUNAS'}",
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
             ),
 
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 20),
-              child: Divider(),
-            ),
+            const SizedBox(height: 30),
 
+            // --- TABEL RINCIAN BARANG ---
             const Text(
-              "RINCIAN BARANG & MATERIAL",
+              "RINCIAN MATERIAL & JASA",
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 14,
                 fontWeight: FontWeight.bold,
-                color: Colors.grey,
-                letterSpacing: 1.2,
+                color: Colors.black87,
+                letterSpacing: 1.1,
               ),
             ),
             const SizedBox(height: 15),
 
-            // --- FETCH DATA DARI projects_item ---
+            // Mengambil data item dari tabel projects_item
             FutureBuilder<List<Map<String, dynamic>>>(
               future: supabase
                   .from('projects_item')
@@ -101,16 +118,25 @@ class _DetailBayarPageState extends State<DetailBayarPage> {
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(
-                    child: LinearProgressIndicator(color: Color(0xFFD4B07E)),
+                    child: Padding(
+                      padding: EdgeInsets.all(20),
+                      child: CircularProgressIndicator(
+                        color: Color(0xFFD4B07E),
+                      ),
+                    ),
                   );
                 }
 
                 if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(20.0),
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20),
+                    child: Center(
                       child: Text(
-                        "Rincian barang sedang disiapkan oleh Admin.",
+                        "Rincian barang belum tersedia.",
+                        style: TextStyle(
+                          fontStyle: FontStyle.italic,
+                          color: Colors.grey,
+                        ),
                       ),
                     ),
                   );
@@ -118,80 +144,113 @@ class _DetailBayarPageState extends State<DetailBayarPage> {
 
                 final items = snapshot.data!;
 
-                return ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: items.length,
-                  itemBuilder: (context, index) {
-                    final item = items[index];
-
-                    // SESUAIKAN DENGAN NAMA KOLOM DI DATABASE
-                    double harga =
-                        double.tryParse(item['harga']?.toString() ?? '0') ?? 0;
-                    int qty = int.tryParse(item['qty']?.toString() ?? '0') ?? 0;
-                    double subtotal = harga * qty;
-
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 15),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                return Column(
+                  children: [
+                    // Header Baris
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: const BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(color: Colors.black12),
+                        ),
+                      ),
+                      child: const Row(
                         children: [
                           Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  item['nama_barang'] ?? "Item Tanpa Nama",
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 15,
-                                  ),
-                                ),
-                                Text(
-                                  "$qty unit x ${formatter.format(harga)}",
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                              ],
+                            flex: 3,
+                            child: Text(
+                              "Barang",
+                              style: TextStyle(fontWeight: FontWeight.bold),
                             ),
                           ),
-                          Text(
-                            formatter.format(subtotal),
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
+                          Expanded(
+                            flex: 1,
+                            child: Text(
+                              "Qty",
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              "Total",
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                              textAlign: TextAlign.right,
                             ),
                           ),
                         ],
                       ),
-                    );
-                  },
+                    ),
+
+                    // List Item
+                    ...items.map((item) {
+                      // Nama kolom sesuai gambar database: nama_item, harga, jumlah
+                      String nama = item['nama_item']?.toString() ?? "Item";
+                      double harga =
+                          double.tryParse(item['harga']?.toString() ?? '0') ??
+                          0;
+                      int qty =
+                          int.tryParse(item['jumlah']?.toString() ?? '0') ?? 0;
+                      double subtotal = harga * qty;
+
+                      return Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: const BoxDecoration(
+                          border: Border(
+                            bottom: BorderSide(
+                              color: Colors.black12,
+                              width: 0.5,
+                            ),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(flex: 3, child: Text(nama)),
+                            Expanded(
+                              flex: 1,
+                              child: Text(
+                                qty.toString(),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                            Expanded(
+                              flex: 2,
+                              child: Text(
+                                formatter.format(subtotal),
+                                textAlign: TextAlign.right,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ],
                 );
               },
             ),
 
-            const Divider(thickness: 1.5, height: 40),
+            const SizedBox(height: 25),
 
-            // --- TOTAL TAGIHAN ---
+            // --- TOTAL AKHIR ---
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: const Color(0xFFD4B07E).withOpacity(0.1),
+                color: Colors.grey[50],
                 borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.black12),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
-                    "TOTAL AKHIR",
+                    "TOTAL TAGIHAN",
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   Text(
                     formatter.format(totalTagihan),
                     style: const TextStyle(
-                      fontSize: 22,
+                      fontSize: 20,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFFD4B07E),
                     ),
@@ -202,15 +261,13 @@ class _DetailBayarPageState extends State<DetailBayarPage> {
 
             const SizedBox(height: 30),
 
-            // --- INFO REKENING ---
-            if (!isLunas) _buildPaymentInstruction(),
-
-            const SizedBox(height: 20),
-            if (!isLunas)
+            // --- INSTRUKSI PEMBAYARAN (Hanya muncul jika belum lunas) ---
+            if (!isLunas) ...[
+              _buildPaymentInfo(),
+              const SizedBox(height: 20),
               const Center(
                 child: Text(
-                  "Silahkan kirim bukti bayar ke WhatsApp Admin\nsetelah melakukan transfer.",
-                  textAlign: TextAlign.center,
+                  "*Silahkan lampirkan bukti transfer ke Admin via WhatsApp.",
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.grey,
@@ -218,52 +275,43 @@ class _DetailBayarPageState extends State<DetailBayarPage> {
                   ),
                 ),
               ),
+            ],
           ],
         ),
       ),
     );
   }
 
-  Widget _buildPaymentInstruction() {
+  Widget _buildPaymentInfo() {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.grey[100],
+        color: Colors.blue.withOpacity(0.05),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.black12),
+        border: Border.all(color: Colors.blue.withOpacity(0.2)),
       ),
       child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            "Transfer ke Rekening:",
+            "Transfer Pembayaran:",
             style: TextStyle(fontWeight: FontWeight.bold),
           ),
-          SizedBox(height: 15),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                "Bank Mandiri",
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.blue,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Icon(Icons.copy, size: 16, color: Colors.grey),
-            ],
+          SizedBox(height: 10),
+          Text(
+            "Bank Mandiri",
+            style: TextStyle(fontSize: 12, color: Colors.blue),
           ),
           Text(
             "123-456-7890",
             style: TextStyle(
-              fontSize: 24,
+              fontSize: 22,
               fontWeight: FontWeight.bold,
-              letterSpacing: 1.5,
+              letterSpacing: 1.2,
             ),
           ),
-          Text("a/n Karoseri Maju Jaya", style: TextStyle(fontSize: 14)),
+          Text("a/n Karoseri Bus Wisata", style: TextStyle(fontSize: 14)),
         ],
       ),
     );

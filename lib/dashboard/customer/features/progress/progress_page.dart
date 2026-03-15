@@ -20,7 +20,6 @@ class _ProgressPageState extends State<ProgressPage> {
     _fetchMyProjects();
   }
 
-  // Fungsi fetch data yang akan dipanggil saat inisialisasi & refresh manual
   Future<void> _fetchMyProjects() async {
     try {
       if (!mounted) return;
@@ -67,9 +66,8 @@ class _ProgressPageState extends State<ProgressPage> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      // REFRESH INDICATOR: Agar bisa ditarik ke bawah (Force Refresh)
       body: RefreshIndicator(
-        onRefresh: _fetchMyProjects, // Panggil fungsi fetch data lagi
+        onRefresh: _fetchMyProjects,
         color: const Color(0xFFD4B07E),
         child: isLoading
             ? const Center(
@@ -78,7 +76,6 @@ class _ProgressPageState extends State<ProgressPage> {
             : myProjects.isEmpty
             ? _buildEmptyState()
             : ListView.builder(
-                // Memastikan list bisa ditarik meski isinya sedikit
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.all(20),
                 itemCount: myProjects.length,
@@ -87,12 +84,13 @@ class _ProgressPageState extends State<ProgressPage> {
 
                   return GestureDetector(
                     onTap: () {
-                      String hp = project['no_hp']?.toString() ?? '';
+                      // PERBAIKAN: Kirim id_project yang spesifik
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) =>
-                              DetailProgressPage(noHpCustomer: hp),
+                          builder: (context) => DetailProgressPage(
+                            projectId: project['id_project'],
+                          ),
                         ),
                       );
                     },
@@ -136,7 +134,6 @@ class _ProgressPageState extends State<ProgressPage> {
                               fontWeight: FontWeight.w500,
                             ),
                           ),
-                          // PERSEN SUDAH DIHAPUS TOTAL DI SINI
                           const SizedBox(height: 5),
                           const Text(
                             "Ketuk untuk melihat detail tahapan",
@@ -158,7 +155,6 @@ class _ProgressPageState extends State<ProgressPage> {
 
   Widget _buildEmptyState() {
     return ListView(
-      // Pakai ListView agar RefreshIndicator bisa jalan di layar kosong
       children: [
         SizedBox(height: MediaQuery.of(context).size.height * 0.3),
         const Icon(

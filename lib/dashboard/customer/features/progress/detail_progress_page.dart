@@ -3,15 +3,15 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 
 class DetailProgressPage extends StatefulWidget {
-  final String noHpCustomer;
-  const DetailProgressPage({super.key, required this.noHpCustomer});
+  // Sekarang menerima projectId (dynamic agar fleksibel int/String)
+  final dynamic projectId;
+  const DetailProgressPage({super.key, required this.projectId});
 
   @override
   State<DetailProgressPage> createState() => _DetailProgressPageState();
 }
 
 class _DetailProgressPageState extends State<DetailProgressPage> {
-  // Masukkan daftar tahapan di sini agar rapi
   final List<Map<String, String>> daftarTahapan = [
     {
       'key': 'tahap_1',
@@ -83,109 +83,92 @@ class _DetailProgressPageState extends State<DetailProgressPage> {
         stream: Supabase.instance.client
             .from('projects')
             .stream(primaryKey: ['id_project'])
-            .eq('no_hp', widget.noHpCustomer),
+            // PERBAIKAN: Filter berdasarkan id_project agar data unik
+            .eq('id_project', widget.projectId),
         builder: (context, snapshot) {
-          // 1. CEK LOADING
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(
               child: CircularProgressIndicator(color: Color(0xFFD4B07E)),
             );
           }
 
-          // 2. CEK ERROR ATAU DATA KOSONG (Mencegah Crash)
           if (snapshot.hasError ||
               !snapshot.hasData ||
               snapshot.data!.isEmpty) {
-            return RefreshIndicator(
-              onRefresh: () async => setState(() {}),
-              child: ListView(
-                children: [
-                  SizedBox(height: MediaQuery.of(context).size.height * 0.3),
-                  const Center(
-                    child: Text(
-                      "Data project belum tersedia.\nSilakan tarik ke bawah untuk muat ulang.",
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ],
-              ),
-            );
+            return const Center(child: Text("Data proyek tidak ditemukan."));
           }
 
+          // Karena filter ID unik, maka .first adalah proyek yang benar
           final project = snapshot.data!.first;
           final List<String> images = _parseImages(project['foto_url']);
 
-          return RefreshIndicator(
-            onRefresh: () async => setState(() {}),
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    project['nama_project']?.toString().toUpperCase() ??
-                        "PROYEK",
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFFD4B07E),
+          return SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  project['nama_project']?.toString().toUpperCase() ?? "PROYEK",
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFFD4B07E),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  "Foto Progres Terbaru",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 10),
+
+                if (images.isEmpty)
+                  _buildEmptyPhoto()
+                else
+                  CarouselSlider(
+                    options: CarouselOptions(
+                      height: 220,
+                      enlargeCenterPage: true,
+                      enableInfiniteScroll: false,
                     ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  const Text(
-                    "Foto Progres Terbaru",
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 10),
-
-                  if (images.isEmpty)
-                    _buildEmptyPhoto()
-                  else
-                    CarouselSlider(
-                      options: CarouselOptions(
-                        height: 220,
-                        enlargeCenterPage: true,
-                        enableInfiniteScroll: false,
-                      ),
-                      items: images
-                          .map(
-                            (url) => GestureDetector(
-                              onTap: () => _showFullScreenImage(context, url),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(15),
-                                child: Image.network(
-                                  url,
-                                  fit: BoxFit.cover,
-                                  width: double.infinity,
-                                  errorBuilder: (_, __, ___) => const Center(
-                                    child: Text("Gagal memuat gambar"),
-                                  ),
+                    items: images
+                        .map(
+                          (url) => GestureDetector(
+                            onTap: () => _showFullScreenImage(context, url),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(15),
+                              child: Image.network(
+                                url,
+                                fit: BoxFit.cover,
+                                width: double.infinity,
+                                errorBuilder: (_, __, ___) => const Center(
+                                  child: Text("Gagal memuat gambar"),
                                 ),
                               ),
                             ),
-                          )
-                          .toList(),
-                    ),
-
-                  const SizedBox(height: 30),
-                  const Text(
-                    "Alur Pengerjaan Karoseri",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          ),
+                        )
+                        .toList(),
                   ),
-                  const SizedBox(height: 15),
 
-                  // Mapping Tahapan 1-7
-                  ...daftarTahapan.map((t) {
-                    return _buildStepItem(
-                      judul: t['judul']!,
-                      sub: t['sub']!,
-                      status: project[t['key']] ?? 'Belum dikerjakan',
-                    );
-                  }).toList(),
-                ],
-              ),
+                const SizedBox(height: 30),
+                const Text(
+                  "Alur Pengerjaan Karoseri",
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                const SizedBox(height: 15),
+
+                ...daftarTahapan
+                    .map(
+                      (t) => _buildStepItem(
+                        judul: t['judul']!,
+                        sub: t['sub']!,
+                        status: project[t['key']] ?? 'Belum dikerjakan',
+                      ),
+                    )
+                    .toList(),
+              ],
             ),
           );
         },
