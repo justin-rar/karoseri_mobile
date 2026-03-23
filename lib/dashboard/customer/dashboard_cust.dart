@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:karoseri_mobile/auth/login.dart'; // Import LoginPage kamu
+import 'package:karoseri_mobile/auth/login.dart'; // Sesuaikan path LoginPage kamu
 import 'features/progress/progress_page.dart';
 import 'features/invoice/invoice_page.dart';
 
@@ -25,7 +25,6 @@ class _DashboardCustState extends State<DashboardCust> {
     final user = supabase.auth.currentUser;
     if (user != null) {
       setState(() {
-        // Mengambil nama dari metadata atau email
         userName =
             user.userMetadata?['nama'] ??
             user.userMetadata?['full_name'] ??
@@ -40,7 +39,6 @@ class _DashboardCustState extends State<DashboardCust> {
     try {
       await supabase.auth.signOut();
       if (mounted) {
-        // Navigasi balik ke LoginPage dan hapus semua history page
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => const LoginPage()),
           (route) => false,
@@ -96,11 +94,12 @@ class _DashboardCustState extends State<DashboardCust> {
       backgroundColor: Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 50),
+          // Padding vertical disesuaikan menjadi 40 agar tidak terlalu mepet atas
+          padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 40),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --- WELCOME HEADER ---
+              // --- WELCOME HEADER (LANGSUNG DI ATAS) ---
               Text(
                 "HELLO, ${userName.toLowerCase()}",
                 style: const TextStyle(
@@ -118,15 +117,16 @@ class _DashboardCustState extends State<DashboardCust> {
                   height: 1.5,
                 ),
               ),
-              const SizedBox(height: 60),
+              const SizedBox(height: 50),
 
-              // --- MENU GRID ---
+              // --- MENU GRID DENGAN LOGO/ICON RELEVAN ---
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
                     child: _buildMenuCard(
                       title: "Lihat Progress",
+                      iconData: Icons.local_shipping_rounded, // Icon Truk/Bus
                       onTap: () {
                         Navigator.push(
                           context,
@@ -141,6 +141,8 @@ class _DashboardCustState extends State<DashboardCust> {
                   Expanded(
                     child: _buildMenuCard(
                       title: "Lihat Invoice Tagihan",
+                      iconData:
+                          Icons.receipt_long_rounded, // Icon Kertas Invoice
                       onTap: () {
                         Navigator.push(
                           context,
@@ -154,7 +156,7 @@ class _DashboardCustState extends State<DashboardCust> {
                 ],
               ),
 
-              const SizedBox(height: 80),
+              const SizedBox(height: 60),
 
               // --- TOMBOL LOGOUT ---
               Center(
@@ -179,25 +181,44 @@ class _DashboardCustState extends State<DashboardCust> {
     );
   }
 
-  Widget _buildMenuCard({required String title, required VoidCallback onTap}) {
+  // WIDGET CARD MENU MODERN DENGAN LOGO DI DALAMNYA
+  Widget _buildMenuCard({
+    required String title,
+    required IconData iconData,
+    required VoidCallback onTap,
+  }) {
     return Column(
       children: [
         GestureDetector(
           onTap: onTap,
           child: Container(
-            height: 240, // Sedikit disesuaikan agar proporsional
+            height: 200, // Tinggi proporsional
+            width: double.infinity,
             decoration: BoxDecoration(
-              color: const Color(0xFFD4B07E),
-              borderRadius: BorderRadius.circular(4),
+              color: const Color(0xFFD4B07E), // Warna coklat karoseri
+              borderRadius: BorderRadius.circular(12), // Melengkung modern
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 15,
+                  offset: const Offset(0, 8),
+                ),
+              ],
             ),
             child: Stack(
               children: [
-                Center(
-                  child: CustomPaint(
-                    size: const Size(double.infinity, double.infinity),
-                    painter: CrossPainter(),
+                // Logo/Icon watermark transparan di kanan bawah kotak
+                Positioned(
+                  right: -20,
+                  bottom: -20,
+                  child: Icon(
+                    iconData,
+                    size: 150,
+                    color: Colors.white.withOpacity(0.15),
                   ),
                 ),
+                // Logo/Icon Solid di Tengah Menu
+                Center(child: Icon(iconData, size: 80, color: Colors.white)),
               ],
             ),
           ),
@@ -215,18 +236,4 @@ class _DashboardCustState extends State<DashboardCust> {
       ],
     );
   }
-}
-
-class CrossPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.black.withOpacity(0.2)
-      ..strokeWidth = 1.0;
-    canvas.drawLine(Offset.zero, Offset(size.width, size.height), paint);
-    canvas.drawLine(Offset(0, size.height), Offset(size.width, 0), paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
