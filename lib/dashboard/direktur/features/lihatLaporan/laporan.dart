@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-// Mengimpor file detail yang sudah kamu buat
 import 'detaillaporan.dart';
 
 class ListLaporanPage extends StatefulWidget {
@@ -14,7 +13,8 @@ class _ListLaporanPageState extends State<ListLaporanPage> {
   final SupabaseClient supabase = Supabase.instance.client;
 
   String? selectedMonth;
-  String? selectedYear;
+  // ✅ FIX: Default tahun diset ke 2026 agar langsung relevan
+  String selectedYear = '2026';
 
   final List<String> months = [
     'Januari',
@@ -33,20 +33,31 @@ class _ListLaporanPageState extends State<ListLaporanPage> {
 
   final List<String> years = ['2024', '2025', '2026', '2027'];
 
-  Stream<List<Map<String, dynamic>>> _getProjects() {
+  // ✅ FIX BUG #1 & #2: Pakai Future (bukan Stream) + kolom tgl_buat yang benar
+  Future<List<Map<String, dynamic>>> _getProjects() async {
     var query = supabase.from('projects').select('*');
 
-    // Filter logika menggunakan kolom 'tanggal' di Supabase
-    if (selectedMonth != null && selectedYear != null) {
+    if (selectedMonth != null) {
       int monthIdx = months.indexOf(selectedMonth!) + 1;
       String monthStr = monthIdx.toString().padLeft(2, '0');
 
+      // ✅ FIX BUG #3: Hitung bulan berikutnya agar range tanggal akurat
+      int nextMonth = monthIdx + 1;
+      String nextYear = selectedYear;
+      if (nextMonth > 12) {
+        nextMonth = 1;
+        nextYear = (int.parse(selectedYear) + 1).toString();
+      }
+      String nextMonthStr = nextMonth.toString().padLeft(2, '0');
+
+      // ✅ FIX BUG #2: Ganti 'tanggal' → 'tgl_buat' sesuai schema Supabase
       query = query
-          .gte('tanggal', '$selectedYear-$monthStr-01')
-          .lte('tanggal', '$selectedYear-$monthStr-31');
+          .gte('tgl_buat', '$selectedYear-$monthStr-01')
+          .lt('tgl_buat', '$nextYear-$nextMonthStr-01');
     }
 
-    return query.order('created_at', ascending: false).asStream();
+    final result = await query.order('created_at', ascending: false);
+    return List<Map<String, dynamic>>.from(result);
   }
 
   @override
@@ -68,7 +79,7 @@ class _ListLaporanPageState extends State<ListLaporanPage> {
       ),
       body: Column(
         children: [
-          // Bagian Filter Dropdown
+          // Filter Dropdown
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             child: Row(
@@ -80,9 +91,15 @@ class _ListLaporanPageState extends State<ListLaporanPage> {
                       border: OutlineInputBorder(),
                     ),
                     value: selectedMonth,
-                    items: months
-                        .map((m) => DropdownMenuItem(value: m, child: Text(m)))
-                        .toList(),
+                    items: [
+                      const DropdownMenuItem(
+                        value: null,
+                        child: Text('Semua Bulan'),
+                      ),
+                      ...months.map(
+                        (m) => DropdownMenuItem(value: m, child: Text(m)),
+                      ),
+                    ],
                     onChanged: (val) => setState(() => selectedMonth = val),
                   ),
                 ),
@@ -93,25 +110,38 @@ class _ListLaporanPageState extends State<ListLaporanPage> {
                       labelText: 'Tahun',
                       border: OutlineInputBorder(),
                     ),
-                    value: selectedYear ?? '2026',
+                    value: selectedYear,
                     items: years
                         .map((y) => DropdownMenuItem(value: y, child: Text(y)))
                         .toList(),
-                    onChanged: (val) => setState(() => selectedYear = val),
+                    onChanged: (val) {
+                      if (val != null) setState(() => selectedYear = val);
+                    },
                   ),
                 ),
               ],
             ),
           ),
 
-          // List Data Proyek dari Supabase
+          // ✅ FIX BUG #1: Pakai FutureBuilder dengan key unik agar
+          //    rebuild otomatis setiap kali filter berubah
           Expanded(
-            child: StreamBuilder<List<Map<String, dynamic>>>(
-              stream: _getProjects(),
+            child: FutureBuilder<List<Map<String, dynamic>>>(
+              key: ValueKey('$selectedMonth-$selectedYear'),
+              future: _getProjects(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(
                     child: CircularProgressIndicator(color: Color(0xFFD4B07E)),
+                  );
+                }
+
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Text(
+                      "Terjadi kesalahan: ${snapshot.error}",
+                      style: const TextStyle(color: Colors.red),
+                    ),
                   );
                 }
 
@@ -152,7 +182,6 @@ class _ListLaporanPageState extends State<ListLaporanPage> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              // PERBAIKAN: Menggunakan DetailLaporanDirekturPage dan parameter 'project'
                               builder: (context) =>
                                   DetailLaporanDirekturPage(project: item),
                             ),

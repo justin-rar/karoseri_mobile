@@ -1,15 +1,58 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'features/lihatLaporan/laporan.dart';
+import 'features/backup/backup_page.dart';
 
-class DashboardDirektur extends StatelessWidget {
-  final String? namaDirektur; // Pakai tanda tanya (?) agar boleh kosong
+class DashboardDirektur extends StatefulWidget {
+  final String? namaDirektur;
 
   const DashboardDirektur({super.key, this.namaDirektur});
 
   @override
+  State<DashboardDirektur> createState() => _DashboardDirekturState();
+}
+
+class _DashboardDirekturState extends State<DashboardDirektur> {
+  final SupabaseClient supabase = Supabase.instance.client;
+
+  int totalProyek = 0;
+  int onProgress = 0;
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchStats();
+  }
+
+  Future<void> _fetchStats() async {
+    try {
+      final allProjects = await supabase
+          .from('projects')
+          .select('status_bayar');
+
+      final total = allProjects.length;
+      final progress = allProjects.where((p) {
+        final status = (p['status_bayar'] ?? '').toString().toLowerCase();
+        return status != 'lunas';
+      }).length;
+
+      if (mounted) {
+        setState(() {
+          totalProyek = total;
+          onProgress = progress;
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetch stats: $e');
+      if (mounted) setState(() => isLoading = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Jika namaDirektur null, pakai default "DIRECTOR"
-    final displayNama = namaDirektur ?? "DIRECTOR";
+    final displayNama = widget.namaDirektur ?? "DIRECTOR";
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -31,7 +74,6 @@ class DashboardDirektur extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 25),
-
               const Text(
                 "Selamat datang di pusat kendali strategis. Pantau efisiensi produksi dan validitas laporan karoseri secara real-time.",
                 style: TextStyle(
@@ -43,13 +85,29 @@ class DashboardDirektur extends StatelessWidget {
               ),
               const SizedBox(height: 40),
 
-              Row(
-                children: [
-                  _buildStatItem("Total Proyek", "12"),
-                  const SizedBox(width: 20),
-                  _buildStatItem("On Progress", "05"),
-                ],
-              ),
+              isLoading
+                  ? const SizedBox(
+                      height: 60,
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          color: Color(0xFFD4B07E),
+                          strokeWidth: 2,
+                        ),
+                      ),
+                    )
+                  : Row(
+                      children: [
+                        _buildStatItem(
+                          "Total Proyek",
+                          totalProyek.toString().padLeft(2, '0'),
+                        ),
+                        const SizedBox(width: 20),
+                        _buildStatItem(
+                          "On Progress",
+                          onProgress.toString().padLeft(2, '0'),
+                        ),
+                      ],
+                    ),
               const SizedBox(height: 60),
 
               Row(
@@ -59,6 +117,7 @@ class DashboardDirektur extends StatelessWidget {
                     child: _buildMenuCard(
                       context,
                       title: "Lihat Laporan",
+                      imagePath: 'assets/images/laporan.jpg',
                       onTap: () {
                         Navigator.push(
                           context,
@@ -70,12 +129,20 @@ class DashboardDirektur extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 30),
+                  // ✅ Menu Backup menggantikan Monitoring
                   Expanded(
                     child: _buildMenuCard(
                       context,
-                      title: "Monitoring",
-                      isLocked: true,
-                      onTap: () {},
+                      title: "Backup",
+                      icon: Icons.cloud_download_outlined,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const BackupPage(),
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ],
@@ -120,7 +187,8 @@ class DashboardDirektur extends StatelessWidget {
     BuildContext context, {
     required String title,
     required VoidCallback onTap,
-    bool isLocked = false,
+    String? imagePath,
+    IconData? icon,
   }) {
     return Column(
       children: [
@@ -130,11 +198,23 @@ class DashboardDirektur extends StatelessWidget {
             aspectRatio: 0.65,
             child: Container(
               decoration: BoxDecoration(
-                color: isLocked ? Colors.grey[200] : const Color(0xFFD4B07E),
+                color: const Color(0xFFD4B07E),
                 borderRadius: BorderRadius.circular(4),
               ),
-              child: isLocked
-                  ? const Icon(Icons.lock_outline, color: Colors.black26)
+              child: imagePath != null
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: Image.asset(
+                        imagePath,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: double.infinity,
+                        errorBuilder: (context, error, stackTrace) =>
+                            CustomPaint(painter: CrossPainter()),
+                      ),
+                    )
+                  : icon != null
+                  ? Icon(icon, color: Colors.white.withOpacity(0.85), size: 40)
                   : CustomPaint(painter: CrossPainter()),
             ),
           ),
@@ -143,10 +223,10 @@ class DashboardDirektur extends StatelessWidget {
         Text(
           title,
           textAlign: TextAlign.center,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w500,
-            color: isLocked ? Colors.black38 : Colors.black,
+            color: Colors.black,
           ),
         ),
       ],
