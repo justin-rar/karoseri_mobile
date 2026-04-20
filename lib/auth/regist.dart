@@ -61,23 +61,42 @@ class _RegisterPageState extends State<RegisterPage> {
       final user = response.user;
 
       if (user != null) {
-        // 2. Simpan ke tabel 'Users'
-        await supabase.from('Users').insert({
-          'id_user': user.id,
-          'email': emailController.text.trim(),
-          'nama': namaController.text.trim(),
-          'no_hp': noHpController.text.trim(),
-          'role': 'Customer',
-        });
+        // 2. Coba Simpan ke tabel 'Users'
+        // Karena Confirm Email AKTIF, user belum memiliki sesi aktif (belum login).
+        // Jika tabel Users memiliki RLS (Row Level Security), insert ini mungkin diblokir.
+        // Kita bungkus dengan try-catch terpisah agar registrasi tetap dianggap sukses.
+        try {
+          await supabase.from('Users').insert({
+            'id_user': user.id,
+            'email': emailController.text.trim(),
+            'nama': namaController.text.trim(),
+            'no_hp': noHpController.text.trim(),
+            'role': 'Customer',
+          });
+        } catch (dbError) {
+          debugPrint(
+            "Info: Insert ke tabel Users ditunda/gagal karena RLS atau belum verifikasi email. Error: $dbError",
+          );
+          // Data tetap aman di Auth Metadata, bisa di-insert nanti saat user login pertama kali.
+        }
 
         if (mounted) {
-          _showSnackBar("Registrasi Berhasil! Silakan Login.", Colors.green);
-          Navigator.pop(context);
+          // 3. Ubah pesan sukses agar user mengecek email
+          _showSnackBar(
+            "Registrasi Berhasil! Silakan cek kotak masuk/spam email Anda untuk verifikasi.",
+            Colors.green,
+          );
+          Navigator.pop(context); // Kembali ke halaman Login
         }
+      }
+    } on AuthException catch (e) {
+      // Menangkap error spesifik dari Supabase Auth
+      if (mounted) {
+        _showSnackBar("Gagal Daftar: ${e.message}", Colors.redAccent);
       }
     } catch (e) {
       if (mounted) {
-        _showSnackBar("Error: ${e.toString()}", Colors.redAccent);
+        _showSnackBar("Terjadi kesalahan: ${e.toString()}", Colors.redAccent);
       }
     } finally {
       if (mounted) setState(() => isLoading = false);

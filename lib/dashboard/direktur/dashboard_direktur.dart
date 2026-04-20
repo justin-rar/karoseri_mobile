@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:karoseri_mobile/auth/login.dart'; // Import disamakan dengan dashboard customer
 import 'features/lihatLaporan/laporan.dart';
 import 'features/backup/backup_page.dart';
 
@@ -23,6 +24,27 @@ class _DashboardDirekturState extends State<DashboardDirektur> {
   void initState() {
     super.initState();
     _fetchStats();
+  }
+
+  // --- FUNGSI LOGOUT (DIUBAH AGAR PASTI BISA) ---
+  Future<void> _handleLogout() async {
+    try {
+      await supabase.auth.signOut();
+      if (mounted) {
+        // Menggunakan cara yang sama dengan Dashboard Customer
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const LoginPage()),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      debugPrint('Error logout: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Error saat keluar: $e")));
+      }
+    }
   }
 
   Future<void> _fetchStats() async {
@@ -57,99 +79,159 @@ class _DashboardDirekturState extends State<DashboardDirektur> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 50),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                "HELLO,\n$displayNama",
-                style: const TextStyle(
-                  fontSize: 52,
-                  fontWeight: FontWeight.w300,
-                  letterSpacing: -1,
-                  color: Colors.black,
-                  fontFamily: 'Serif',
-                  height: 1.1,
-                ),
-              ),
-              const SizedBox(height: 25),
-              const Text(
-                "Selamat datang di pusat kendali strategis. Pantau efisiensi produksi dan validitas laporan karoseri secara real-time.",
-                style: TextStyle(
-                  fontSize: 15,
-                  height: 1.6,
-                  color: Colors.black87,
-                  fontWeight: FontWeight.w300,
-                ),
-              ),
-              const SizedBox(height: 40),
-
-              isLoading
-                  ? const SizedBox(
-                      height: 60,
-                      child: Center(
-                        child: CircularProgressIndicator(
-                          color: Color(0xFFD4B07E),
-                          strokeWidth: 2,
-                        ),
-                      ),
-                    )
-                  : Row(
-                      children: [
-                        _buildStatItem(
-                          "Total Proyek",
-                          totalProyek.toString().padLeft(2, '0'),
-                        ),
-                        const SizedBox(width: 20),
-                        _buildStatItem(
-                          "On Progress",
-                          onProgress.toString().padLeft(2, '0'),
-                        ),
-                      ],
-                    ),
-              const SizedBox(height: 60),
-
-              Row(
+        child: Stack(
+          children: [
+            SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 50),
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: _buildMenuCard(
-                      context,
-                      title: "Lihat Laporan",
-                      imagePath: 'assets/images/laporan.jpg',
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const ListLaporanPage(),
-                          ),
-                        );
-                      },
+                  Text(
+                    "HELLO,\n$displayNama",
+                    style: const TextStyle(
+                      fontSize: 52,
+                      fontWeight: FontWeight.w300,
+                      letterSpacing: -1,
+                      color: Colors.black,
+                      fontFamily: 'Serif',
+                      height: 1.1,
                     ),
                   ),
-                  const SizedBox(width: 30),
-                  // ✅ Menu Backup menggantikan Monitoring
-                  Expanded(
-                    child: _buildMenuCard(
-                      context,
-                      title: "Backup",
-                      icon: Icons.cloud_download_outlined,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const BackupPage(),
-                          ),
-                        );
-                      },
+                  const SizedBox(height: 25),
+                  const Text(
+                    "Selamat datang di pusat kendali strategis. Pantau efisiensi produksi dan validitas laporan karoseri secara real-time.",
+                    style: TextStyle(
+                      fontSize: 15,
+                      height: 1.6,
+                      color: Colors.black87,
+                      fontWeight: FontWeight.w300,
                     ),
                   ),
+                  const SizedBox(height: 40),
+                  isLoading
+                      ? const SizedBox(
+                          height: 60,
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              color: Color(0xFFD4B07E),
+                              strokeWidth: 2,
+                            ),
+                          ),
+                        )
+                      : Row(
+                          children: [
+                            _buildStatItem(
+                              "Total Proyek",
+                              totalProyek.toString().padLeft(2, '0'),
+                            ),
+                            const SizedBox(width: 20),
+                            _buildStatItem(
+                              "On Progress",
+                              onProgress.toString().padLeft(2, '0'),
+                            ),
+                          ],
+                        ),
+                  const SizedBox(height: 60),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: _buildMenuCard(
+                          context,
+                          title: "Lihat Laporan",
+                          icon: Icons
+                              .assignment_outlined, // Menambah Logo agar tidak kosong
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const ListLaporanPage(),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 30),
+                      Expanded(
+                        child: _buildMenuCard(
+                          context,
+                          title: "Backup",
+                          icon: Icons.cloud_download_outlined,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const BackupPage(),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 120),
                 ],
               ),
-            ],
-          ),
+            ),
+
+            // --- TOMBOL LOGOUT MERAH DI BAWAH ---
+            Positioned(
+              bottom: 20,
+              left: 30,
+              right: 30,
+              child: TextButton.icon(
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  foregroundColor: Colors.redAccent,
+                ),
+                onPressed: () => _showLogoutDialog(context),
+                icon: const Icon(Icons.logout_rounded, color: Colors.redAccent),
+                label: const Text(
+                  "LOGOUT ACCOUNT",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.5,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
+      ),
+    );
+  }
+
+  void _showLogoutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: const Text("Konfirmasi Logout"),
+        content: const Text("Apakah Anda yakin ingin keluar dari akun ini?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("BATAL", style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _handleLogout();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              "YA, KELUAR",
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -187,7 +269,6 @@ class _DashboardDirekturState extends State<DashboardDirektur> {
     BuildContext context, {
     required String title,
     required VoidCallback onTap,
-    String? imagePath,
     IconData? icon,
   }) {
     return Column(
@@ -201,21 +282,13 @@ class _DashboardDirekturState extends State<DashboardDirektur> {
                 color: const Color(0xFFD4B07E),
                 borderRadius: BorderRadius.circular(4),
               ),
-              child: imagePath != null
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: Image.asset(
-                        imagePath,
-                        fit: BoxFit.cover,
-                        width: double.infinity,
-                        height: double.infinity,
-                        errorBuilder: (context, error, stackTrace) =>
-                            CustomPaint(painter: CrossPainter()),
-                      ),
-                    )
-                  : icon != null
-                  ? Icon(icon, color: Colors.white.withOpacity(0.85), size: 40)
-                  : CustomPaint(painter: CrossPainter()),
+              child: Center(
+                child: Icon(
+                  icon ?? Icons.help_outline,
+                  color: Colors.white.withOpacity(0.9),
+                  size: 45,
+                ),
+              ),
             ),
           ),
         ),
@@ -232,18 +305,4 @@ class _DashboardDirekturState extends State<DashboardDirektur> {
       ],
     );
   }
-}
-
-class CrossPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.black.withOpacity(0.12)
-      ..strokeWidth = 1.0;
-    canvas.drawLine(Offset.zero, Offset(size.width, size.height), paint);
-    canvas.drawLine(Offset(size.width, 0), Offset(0, size.height), paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
