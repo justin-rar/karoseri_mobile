@@ -16,14 +16,12 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
-  bool obscurePassword =
-      true; // State untuk menyembunyikan/menampilkan password
+  bool obscurePassword = true;
 
-  // Warna Utama Aplikasi
   final Color mainColor = const Color(0xFFD4B07E);
 
+  // --- FUNGSI LOGIN ---
   Future<void> loginProses() async {
-    // 1. Tampilkan loading agar user tahu aplikasi sedang bekerja
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -32,14 +30,27 @@ class _LoginPageState extends State<LoginPage> {
     );
 
     try {
-      // 2. Login ke Auth Supabase
-      final response = await Supabase.instance.client.auth.signInWithPassword(
+      final supabase = Supabase.instance.client;
+
+      // 1. Login ke Auth
+      final response = await supabase.auth.signInWithPassword(
         email: emailController.text.trim(),
         password: passwordController.text,
       );
 
-      // 3. Ambil Role dari tabel 'Users'
-      final data = await Supabase.instance.client
+      // 2. CEK VERIFIKASI EMAIL
+      if (response.user != null && response.user!.emailConfirmedAt == null) {
+        if (mounted) Navigator.pop(context); // Tutup loading
+        await supabase.auth.signOut(); // Paksa logout karena belum verif
+        _showSnackBar(
+          "Email belum diverifikasi. Silakan cek inbox/spam Anda.",
+          Colors.orange,
+        );
+        return;
+      }
+
+      // 3. Ambil Role
+      final data = await supabase
           .from('Users')
           .select()
           .eq('id_user', response.user!.id)
@@ -48,9 +59,8 @@ class _LoginPageState extends State<LoginPage> {
       UserModel user = UserModel.fromJson(data);
 
       if (!mounted) return;
-      Navigator.pop(context); // Tutup dialog loading
+      Navigator.pop(context); // Tutup loading
 
-      // 4. Pindah Halaman sesuai Role (Gunakan Huruf Kecil agar Aman)
       String role = user.role.toLowerCase();
 
       if (role == 'project manager') {
@@ -70,18 +80,94 @@ class _LoginPageState extends State<LoginPage> {
         );
       }
     } catch (e) {
-      if (mounted) Navigator.pop(context); // Tutup loading jika error
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Gagal Masuk: ${e.toString()}"),
-            backgroundColor: Colors.redAccent,
-            behavior: SnackBarBehavior.floating, // Efek melayang modern
-          ),
-        );
-      }
+      if (mounted) Navigator.pop(context);
+      _showSnackBar("Gagal Masuk: ${e.toString()}", Colors.redAccent);
     }
+  }
+
+  // --- FUNGSI DIALOG LUPA PASSWORD ---
+  void _showForgotPasswordDialog() {
+    final resetEmailController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
+          ),
+          title: const Text(
+            "Reset Password",
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                "Masukkan email Anda untuk menerima link perubahan password.",
+              ),
+              const SizedBox(height: 15),
+              TextField(
+                controller: resetEmailController,
+                decoration: InputDecoration(
+                  hintText: "nama@email.com",
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Batal", style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: mainColor),
+              onPressed: () async {
+                final email = resetEmailController.text.trim();
+                if (email.isEmpty) return;
+
+                try {
+                  await Supabase.instance.client.auth.resetPasswordForEmail(
+                    email,
+                    redirectTo: 'io.supabase.karoseri://reset-password',
+                  );
+                  if (mounted) {
+                    Navigator.pop(context);
+                    _showSnackBar(
+                      "Link reset berhasil dikirim ke email!",
+                      Colors.green,
+                    );
+                  }
+                } catch (e) {
+                  _showSnackBar(
+                    "Gagal mengirim link: ${e.toString()}",
+                    Colors.red,
+                  );
+                }
+              },
+              child: const Text(
+                "Kirim Link",
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showSnackBar(String msg, Color col) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: col,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   @override
@@ -94,7 +180,7 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50], // Background aplikasi yang lembut
+      backgroundColor: Colors.grey[50],
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -102,7 +188,6 @@ class _LoginPageState extends State<LoginPage> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // --- BAGIAN LOGO & HEADER ---
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -110,7 +195,7 @@ class _LoginPageState extends State<LoginPage> {
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    Icons.airport_shuttle_rounded, // Ikon mikrobus karoseri
+                    Icons.airport_shuttle_rounded,
                     size: 80,
                     color: mainColor,
                   ),
@@ -124,14 +209,7 @@ class _LoginPageState extends State<LoginPage> {
                     letterSpacing: 1.5,
                   ),
                 ),
-                const SizedBox(height: 5),
-                const Text(
-                  "Silakan masuk untuk melanjutkan",
-                  style: TextStyle(color: Colors.grey, fontSize: 14),
-                ),
                 const SizedBox(height: 40),
-
-                // --- FORM KARTU LOGIN ---
                 Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
@@ -147,16 +225,11 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   child: Column(
                     children: [
-                      // Input Email
                       TextField(
                         controller: emailController,
                         keyboardType: TextInputType.emailAddress,
                         decoration: InputDecoration(
                           labelText: "Email",
-                          hintText: "nama@email.com",
-                          hintStyle: TextStyle(
-                            color: Colors.grey.withOpacity(0.5),
-                          ),
                           prefixIcon: Icon(
                             Icons.email_outlined,
                             color: mainColor,
@@ -164,15 +237,9 @@ class _LoginPageState extends State<LoginPage> {
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: mainColor, width: 2),
-                          ),
                         ),
                       ),
                       const SizedBox(height: 18),
-
-                      // Input Password dengan Toggle Mata
                       TextField(
                         controller: passwordController,
                         obscureText: obscurePassword,
@@ -189,24 +256,32 @@ class _LoginPageState extends State<LoginPage> {
                                   : Icons.visibility,
                               color: Colors.grey,
                             ),
-                            onPressed: () {
-                              setState(() {
-                                obscurePassword = !obscurePassword;
-                              });
-                            },
+                            onPressed: () => setState(
+                              () => obscurePassword = !obscurePassword,
+                            ),
                           ),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: mainColor, width: 2),
+                        ),
+                      ),
+
+                      // TOMBOL LUPA PASSWORD
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: _showForgotPasswordDialog,
+                          child: Text(
+                            "Lupa Password?",
+                            style: TextStyle(
+                              color: mainColor,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 30),
 
-                      // Tombol Login Solid
+                      const SizedBox(height: 10),
                       SizedBox(
                         width: double.infinity,
                         height: 52,
@@ -215,7 +290,6 @@ class _LoginPageState extends State<LoginPage> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: mainColor,
                             foregroundColor: Colors.white,
-                            elevation: 0,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -225,7 +299,6 @@ class _LoginPageState extends State<LoginPage> {
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
-                              letterSpacing: 1.1,
                             ),
                           ),
                         ),
@@ -234,8 +307,6 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
                 const SizedBox(height: 30),
-
-                // Tombol Teks Registrasi
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -244,14 +315,12 @@ class _LoginPageState extends State<LoginPage> {
                       style: TextStyle(color: Colors.black54),
                     ),
                     TextButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const RegisterPage(),
-                          ),
-                        );
-                      },
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const RegisterPage(),
+                        ),
+                      ),
                       child: Text(
                         "Daftar di sini",
                         style: TextStyle(
