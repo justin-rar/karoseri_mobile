@@ -8,6 +8,7 @@ import 'package:csv/csv.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
+import 'package:intl/date_symbol_data_local.dart'; // ✅ FIX BUG #1
 
 class BackupPage extends StatefulWidget {
   const BackupPage({super.key});
@@ -20,6 +21,13 @@ class _BackupPageState extends State<BackupPage> {
   final SupabaseClient supabase = Supabase.instance.client;
   bool isLoadingPdf = false;
   bool isLoadingCsv = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // ✅ FIX BUG #1: Inisialisasi locale 'id' sebelum DateFormat dipakai
+    initializeDateFormatting('id', null);
+  }
 
   Future<List<Map<String, dynamic>>> _fetchAllProjects() async {
     final result = await supabase
@@ -97,10 +105,8 @@ class _BackupPageState extends State<BackupPage> {
                 'id',
               ).format(DateTime.parse(p['created_at'].toString()));
             }
-            double total = 0;
-            if (p['total_tagihan'] != null) {
-              total = double.tryParse(p['total_tagihan'].toString()) ?? 0;
-            }
+            double total =
+                double.tryParse(p['total_tagihan']?.toString() ?? '0') ?? 0;
 
             return pw.Container(
               margin: const pw.EdgeInsets.only(bottom: 20),
@@ -112,7 +118,6 @@ class _BackupPageState extends State<BackupPage> {
               child: pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
-                  // Header proyek
                   pw.Container(
                     padding: const pw.EdgeInsets.symmetric(
                       horizontal: 10,
@@ -146,14 +151,10 @@ class _BackupPageState extends State<BackupPage> {
                     ),
                   ),
                   pw.SizedBox(height: 10),
-
-                  // Info transaksi
                   _pdfInfoRow('Nama Pemesan', p['nama_pemesan'] ?? '-'),
                   _pdfInfoRow('Metode Bayar', p['metode_bayar'] ?? '-'),
                   _pdfInfoRow('Status Bayar', p['status_bayar'] ?? '-'),
                   pw.SizedBox(height: 8),
-
-                  // Tabel item
                   if (items.isNotEmpty) ...[
                     pw.Text(
                       'Rincian Barang',
@@ -210,8 +211,6 @@ class _BackupPageState extends State<BackupPage> {
                     ),
                     pw.SizedBox(height: 8),
                   ],
-
-                  // Total
                   pw.Row(
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
@@ -239,7 +238,6 @@ class _BackupPageState extends State<BackupPage> {
         ),
       );
 
-      // Preview & share PDF
       await Printing.layoutPdf(
         onLayout: (format) async => pdf.save(),
         name:
@@ -311,7 +309,6 @@ class _BackupPageState extends State<BackupPage> {
       final projects = await _fetchAllProjects();
 
       List<List<dynamic>> rows = [
-        // Header
         [
           'Nama Proyek',
           'Nama Pemesan',
@@ -321,7 +318,6 @@ class _BackupPageState extends State<BackupPage> {
           'Deskripsi',
           'Tanggal Dibuat',
         ],
-        // Data
         ...projects.map(
           (p) => [
             p['nama_project'] ?? '',
@@ -340,17 +336,29 @@ class _BackupPageState extends State<BackupPage> {
       ];
 
       final csv = const ListToCsvConverter().convert(rows);
-      final dir = await getApplicationDocumentsDirectory();
+
+      // ✅ FIX BUG #2: Simpan ke direktori Downloads/temp lalu share
+      // Gunakan getTemporaryDirectory() agar kompatibel di semua platform
+      final dir = await getTemporaryDirectory();
       final fileName =
           'Backup_Laporan_${DateFormat('yyyyMMdd_HHmm').format(DateTime.now())}.csv';
       final file = File('${dir.path}/$fileName');
       await file.writeAsString(csv);
 
-      await Share.shareXFiles(
-        [XFile(file.path)],
+      // ✅ FIX BUG #2: Pakai ShareResult dan XFile dengan mimeType eksplisit
+      final xFile = XFile(file.path, mimeType: 'text/csv', name: fileName);
+
+      final result = await Share.shareXFiles(
+        [xFile],
         subject: 'Backup Laporan Proyek',
         text: 'File backup laporan proyek dalam format CSV.',
       );
+
+      if (mounted && result.status == ShareResultStatus.success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('CSV berhasil dibagikan!')),
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
@@ -407,7 +415,6 @@ class _BackupPageState extends State<BackupPage> {
             ),
             const SizedBox(height: 40),
 
-            // Kartu PDF
             _buildExportCard(
               icon: Icons.picture_as_pdf_outlined,
               iconColor: const Color(0xFFD4B07E),
@@ -419,7 +426,6 @@ class _BackupPageState extends State<BackupPage> {
             ),
             const SizedBox(height: 16),
 
-            // Kartu CSV
             _buildExportCard(
               icon: Icons.table_chart_outlined,
               iconColor: Colors.green.shade600,
